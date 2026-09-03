@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b10" />
+    <meta
+      name="description"
+      content="基于实时历史口径的 QQQ 相对高低点量化仪表盘。"
+    />
+    <title>QQQ 转折点</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="QQQ 转折点首页">
+          <span class="brand-mark" aria-hidden="true">转</span>
+          <span>
+            <strong>QQQ 转折点</strong>
+            <small>相对高低点量化分析</small>
+          </span>
+        </a>
+        <div class="topbar-actions">
+          <span class="live-pill"><i></i> 数据已就绪</span>
+          <button class="quiet-button" id="open-methodology" type="button">数据口径</button>
+        </div>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="page-title">
+          <div>
+            <p class="eyebrow">样本外验证 • 无前视偏差 • V2.0</p>
+            <h1 id="page-title">看清市场状态。<br /><span>尊重不确定性。</span></h1>
+            <p class="hero-copy">
+              量化 QQQ 的超卖、恐慌、价格延伸与反转条件。
+            </p>
+          </div>
+          <div class="market-snapshot" aria-label="当前市场概览">
+            <div>
+              <span class="metric-label">QQQ / 收盘价</span>
+              <strong id="current-price">—</strong>
+            </div>
+            <div>
+              <span class="metric-label">数据日期</span>
+              <strong id="current-date">—</strong>
+            </div>
+            <div class="state-cell">
+              <span class="metric-label">当前状态</span>
+              <strong class="state-badge" id="market-state">加载中</strong>
+            </div>
+          </div>
+        </section>
+
+        <div class="load-error" id="load-error" hidden>
+          <strong>无法加载分析数据。</strong>
+          <span>请从项目目录启动本地服务器：<code>python -m http.server 8000</code></span>
+        </div>
+
+        <section class="panel signal-overview" aria-labelledby="overview-title">
+          <div class="overview-conclusion">
+            <p class="eyebrow">一眼结论</p>
+            <div class="overview-title-row">
+              <span class="overview-light" id="overview-light" aria-hidden="true"></span>
+              <h2 id="overview-title">正在读取市场状态</h2>
+            </div>
+            <p id="overview-summary">正在汇总评分、恐慌程度和确认信号。</p>
+            <div class="overview-next-step">
+              <span>接下来重点看</span>
+              <strong id="overview-next-step">等待数据</strong>
+            </div>
+          </div>
+          <div class="novice-answers" id="novice-answers"></div>
+        </section>
+
+        <section class="score-grid" aria-label="当前高低点评分">
+          <article class="panel score-panel bottom-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow bottom-text">判断是否接近相对低点</p>
+                <h2>低点可能性评分</h2>
+              </div>
+              <span class="score-tag" id="bottom-band">—</span>
+            </div>
+            <div class="score-readout">
+              <strong id="bottom-score">—</strong><span>/ 100</span>
+            </div>
+            <p class="score-explainer">V2：分数越高，RSI 超卖和短期快速下跌越明显。</p>
+            <div class="score-track score-track-bottom" aria-hidden="true">
+              <i id="bottom-score-bar"></i><b class="threshold-60"></b><b class="threshold-75"></b>
+            </div>
+            <div class="score-ruler" aria-hidden="true">
+              <span>0 正常</span><span>60 关注</span><span>75 极端</span><span>100</span>
+            </div>
+            <div class="confirmation-row">
+              <span>是否已经看到止跌？</span>
+              <strong id="bottom-confirmation">—</strong>
+            </div>
+            <p class="trigger-type" id="bottom-trigger">等待数据</p>
+            <div class="component-list" id="bottom-components"></div>
+          </article>
+
+          <article class="panel score-panel top-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow top-text">判断是否接近相对高点</p>
+                <h2>高点风险评分</h2>
+              </div>
+              <span class="score-tag" id="top-band">—</span>
+            </div>
+            <div class="score-readout">
+              <strong id="top-score">—</strong><span>/ 100</span>
+            </div>
+            <p class="score-explainer">分数越高，过热、低恐慌和快速上涨越明显。</p>
+            <div class="score-track score-track-top" aria-hidden="true">
+              <i id="top-score-bar"></i><b class="threshold-60"></b><b class="threshold-75"></b>
+            </div>
+            <div class="score-ruler" aria-hidden="true">
+              <span>0 正常</span><span>60 关注</span><span>75 极端</span><span>100</span>
+            </div>
+            <div class="confirmation-row">
+              <span>是否已经看到转弱？</span>
+              <strong id="top-confirmation">—</strong>
+            </div>
+            <p class="trigger-type" id="top-trigger">等待数据</p>
+            <div class="component-list" id="top-components"></div>
+          </article>
+        </section>
+
+        <section class="panel raw-panel" aria-labelledby="raw-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">分数从哪里来</p>
+              <h2 id="raw-title">这些数据是什么意思？</h2>
+            </div>
+            <p>不用全部记住：负收益代表近期下跌，负均线偏离代表价格低于均线。</p>
+          </div>
+          <div class="raw-grid" id="raw-metrics"></div>
+        </section>
+
+        <section class="panel model-audit" aria-labelledby="audit-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">先过考试，再改算法</p>
+              <h2 id="audit-title">V2 优化有没有真的变准？</h2>
+            </div>
+            <span class="audit-period" id="audit-period">样本外：—</span>
+          </div>
+          <div class="audit-grid">
+            <article class="audit-card accepted">
+              <div class="audit-card-head">
+                <span>相对低点模型</span><strong>已通过</strong>
+              </div>
+              <div class="audit-score-line">
+                <div><small>旧模型</small><strong id="audit-bottom-v1">—</strong></div>
+                <span>→</span>
+                <div><small>V2 模型</small><strong id="audit-bottom-v2">—</strong></div>
+              </div>
+              <p id="audit-bottom-note">只采用最终测试期也能保持改善的简单规则。</p>
+            </article>
+            <article class="audit-card rejected">
+              <div class="audit-card-head">
+                <span>相对高点模型</span><strong>未通过</strong>
+              </div>
+              <div class="audit-score-line">
+                <div><small>旧模型</small><strong id="audit-top-v1">—</strong></div>
+                <span>→</span>
+                <div><small>最佳候选</small><strong id="audit-top-v2">—</strong></div>
+              </div>
+              <p>仍低于 50%。因此红色评分只表示“高位风险”，暂不称为顶部预测。</p>
+            </article>
+            <article class="audit-card definition">
+              <div class="audit-card-head">
+                <span>怎样算命中？</span><strong>路径检验</strong>
+              </div>
+              <p class="audit-definition"><b>低点：</b>未来 20 日先涨 3%，再跌 3% 之前就算命中。</p>
+              <p class="audit-definition"><b>高点：</b>未来 20 日先跌 3%，再涨 3% 之前才算命中。</p>
+            </article>
+          </div>
+          <p class="audit-footnote">权重和候选模型只在 2022 年以前选择；2022 年以后完全留作最终考试。未通过的模型不会替换线上算法。</p>
+        </section>
+
+        <section class="backtest-section" aria-labelledby="backtest-title">
+          <div class="section-heading backtest-heading">
+            <div>
+              <p class="eyebrow">把规则放回历史 K 线</p>
+              <h2 id="backtest-title">近 5 年，哪里出现过高低点条件？</h2>
+              <p>先看彩色标记，再把鼠标移上去看当时评分，以及之后 20 / 60 日的实际涨跌。</p>
+            </div>
+            <div class="segmented compact year-toggle" id="year-toggle" aria-label="K线时间范围">
+              <button type="button" data-years="1">1年</button>
+              <button type="button" data-years="3">3年</button>
+              <button type="button" data-years="5" class="active">5年</button>
+            </div>
+          </div>
+
+          <article class="panel backtest-panel">
+            <div class="backtest-guide" aria-label="图表阅读说明">
+              <div class="guide-item bottom-guide">
+                <i aria-hidden="true"></i>
+                <span><strong>绿色向上</strong>：低点条件（评分 ≥70）</span>
+              </div>
+              <div class="guide-item top-guide">
+                <i aria-hidden="true"></i>
+                <span><strong>红色向下</strong>：高位风险条件（评分 ≥70，未通过预测验收）</span>
+              </div>
+              <div class="guide-item confirmed-guide">
+                <i aria-hidden="true"></i>
+                <span><strong>大实心标记</strong>：当天还出现止跌 / 转弱确认</span>
+              </div>
+            </div>
+            <div class="backtest-summary" id="backtest-summary"></div>
+            <div class="backtest-chart" id="five-year-chart" role="img" aria-label="QQQ 近五年日K线及潜在高低点历史标记"></div>
+            <p class="backtest-note">
+              这是回看规则，不是“事后挑最准的点”：每个评分只使用当日及以前的数据；标记至少间隔 20 个交易日，且只展示已经走完 60 日观察期的案例。绿色使用已通过的 V2 低点模型，红色仍只是研究中的风险提醒。
+            </p>
+          </article>
+        </section>
+
+        <section class="historical-section" aria-labelledby="historical-title">
+          <div class="section-heading historical-heading">
+            <div>
+              <p class="eyebrow">用历史回答</p>
+              <h2 id="historical-title">过去遇到类似情况，后来怎样？</h2>
+              <p id="selection-description">基于当前分数自动选择最接近的历史阈值。</p>
+            </div>
+            <div class="controls" aria-label="历史分析筛选">
+              <div class="segmented" id="side-toggle">
+                <button type="button" data-side="bottom" class="active">潜在低点</button>
+                <button type="button" data-side="top">高位风险</button>
+              </div>
+              <div class="segmented compact" id="threshold-toggle">
+                <button type="button" data-threshold="70">≥70</button>
+                <button type="button" data-threshold="80">≥80</button>
+                <button type="button" data-threshold="90">≥90</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="outcome-kpis" id="outcome-kpis"></div>
+
+          <details class="advanced-stats">
+            <summary>查看完整的 5 / 10 / 20 / 60 日统计表 <span>进阶数据</span></summary>
+            <div class="outcome-layout">
+              <article class="panel event-count-panel">
+                <span class="metric-label">独立历史案例</span>
+                <strong id="event-count">—</strong>
+                <span id="event-count-caption">同类事件至少间隔 20 个交易日</span>
+              </article>
+              <article class="panel outcome-table-panel">
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>观察期</th>
+                        <th id="win-rate-title">胜率</th>
+                        <th>平均收益</th>
+                        <th>中位收益</th>
+                        <th>最好</th>
+                        <th>最差</th>
+                      </tr>
+                    </thead>
+                    <tbody id="outcome-table"></tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </details>
+        </section>
+
+        <section class="comparison-section" aria-labelledby="comparison-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">等待确认有用吗</p>
+              <h2 id="comparison-title">等待止跌后，历史结果会更好吗？</h2>
+            </div>
+            <p id="comparison-note">同一评分阈值下，对比有无确认条件的 20 日结果。</p>
+          </div>
+          <div class="comparison-verdict" id="comparison-verdict">
+            正在比较确认信号的历史效果。
+          </div>
+          <div class="comparison-grid">
+            <article class="panel comparison-card">
+              <div class="comparison-card-head">
+                <span id="without-label">只看高分，不等确认</span>
+                <strong id="without-count">样本=—</strong>
+              </div>
+              <div class="comparison-metrics" id="without-comparison"></div>
+            </article>
+            <div class="comparison-vs">对比</div>
+            <article class="panel comparison-card confirmed-card">
+              <div class="comparison-card-head">
+                <span id="with-label">要求止跌确认</span>
+                <strong id="with-count">样本=—</strong>
+              </div>
+              <div class="comparison-metrics" id="with-comparison"></div>
+            </article>
+          </div>
+          <div class="sample-warning" id="sample-warning" hidden></div>
+        </section>
+
+        <section class="chart-grid">
+          <article class="panel chart-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">评分有效性</p>
+                <h2>评分区间检验</h2>
+              </div>
+              <span class="test-result" id="monotonic-result">—</span>
+            </div>
+            <p class="chart-caption">20 日中位收益与同方向胜率。分数越极端不代表结果必然更好。</p>
+            <div class="chart" id="bucket-chart" role="img" aria-label="评分区间历史结果图"></div>
+          </article>
+
+          <article class="panel chart-panel event-chart-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">事件路径</p>
+                <h2 id="event-chart-title">请选择一个历史案例</h2>
+              </div>
+              <span class="event-date-chip" id="event-date-chip">—</span>
+            </div>
+            <p class="chart-caption">事件日归一化为 100；显示前 20 日至后 60 个交易日。</p>
+            <div class="chart" id="event-chart" role="img" aria-label="所选历史案例的 QQQ 归一化价格路径"></div>
+          </article>
+        </section>
+
+        <section class="events-section" aria-labelledby="events-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">历史案例 • 评分 ≥70</p>
+              <h2 id="events-title">近期独立案例</h2>
+            </div>
+            <p>点击案例可查看事件前后路径；日期由算法自动生成。</p>
+          </div>
+          <div class="panel events-panel">
+            <div class="event-list-head" aria-hidden="true">
+              <span>日期</span><span>评分</span><span>RSI</span><span>VIX</span><span>20日</span><span>60日</span><span>20日回撤</span>
+            </div>
+            <div class="event-list" id="event-list"></div>
+          </div>
+        </section>
+
+        <aside class="risk-note" id="risk-note">
+          <strong>正确理解评分。</strong>
+          <p>
+            V2 低点评分通过了样本外路径检验，但仍不等于买入信号；高点评分尚未通过顶部预测验收，
+            只能表示过热与高位风险，更不等于做空信号。样本数量、市场结构和路径风险同样重要。
+          </p>
+        </aside>
+      </main>
+
+      <footer>
+        <span>QQQ 转折点 • 规则驱动的历史参照</span>
+        <span id="footer-updated">最后更新 —</span>
+      </footer>
+    </div>
+
+    <dialog id="methodology-dialog" class="methodology-dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">方法说明</p>
+          <h2>数据与统计口径</h2>
+        </div>
+        <button id="close-methodology" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="dialog-body">
+        <section>
+          <h3>数据</h3>
+          <p>QQQ 与 VIX 日线按共同交易日取交集。数据更新脚本优先使用 yfinance；当 Yahoo 限流时，QQQ 使用 Longbridge，VIX 使用 Cboe 官方历史数据。</p>
+        </section>
+        <section>
+          <h3>无前视百分位</h3>
+          <p>每个历史日只使用该日及以前的数据。至少积累 252 日后开始计算，历史达到 2520 个交易日后固定使用约 10 年滚动窗口。</p>
+        </section>
+        <section>
+          <h3>评分</h3>
+          <p>V2 低点评分由 RSI 超卖 40% 与 5/10 日快速下跌 60% 组成，这是通过 2022 年以后样本外测试的简化权重。高点评分仍沿用 V1 的 RSI 30%、VIX 30%、价格偏离 25%、短期上涨 15%，但因未通过样本外验收，只解释为高位风险。</p>
+        </section>
+        <section>
+          <h3>事件与胜率</h3>
+          <p>同类型历史事件至少间隔 20 个交易日，并只纳入已有完整 60 日未来结果的事件。低点胜率指未来收益为正；高点胜率指未来收益为负。</p>
+        </section>
+        <section>
+          <h3>V2 样本外验收</h3>
+          <p>模型只用 2022 年以前的数据选权重；2022 年以后作为未参与调参的最终测试。相对点命中采用对称 3% 路径门槛：20 个交易日内必须先向正确方向走 3%，而不是先向错误方向走 3%。</p>
+        </section>
+        <section>
+          <h3>限制</h3>
+          <p>这是条件统计，不是价格预测。阈值由规则预设，未计交易成本；重叠的未来持有期、宏观制度变化和小样本都可能削弱结论。</p>
+        </section>
+      </div>
+    </dialog>
+
+    <script src="assets/echarts.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
