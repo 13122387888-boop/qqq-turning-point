@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#080b10" />
     <meta
       name="description"
@@ -10,7 +10,7 @@
     />
     <title>QQQ 转折点</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="style.css?v=pivot-v1" />
+    <link rel="stylesheet" href="style.css?v=mobile-v1" />
   </head>
   <body>
     <div class="app-shell">
@@ -59,7 +59,7 @@
           <span>请刷新页面重试；本地使用时需从项目目录启动服务器。</span>
         </div>
 
-        <section class="panel signal-overview" aria-labelledby="overview-title">
+        <section class="panel signal-overview" id="today" aria-labelledby="overview-title">
           <div class="overview-conclusion">
             <p class="eyebrow">一眼结论</p>
             <div class="overview-title-row">
@@ -99,7 +99,10 @@
               <strong id="bottom-confirmation">—</strong>
             </div>
             <p class="trigger-type" id="bottom-trigger">等待数据</p>
-            <div class="component-list" id="bottom-components"></div>
+            <details class="mobile-disclosure score-details" data-mobile-collapse open>
+              <summary>查看低点评分组成</summary>
+              <div class="component-list" id="bottom-components"></div>
+            </details>
           </article>
 
           <article class="panel score-panel top-panel">
@@ -125,7 +128,10 @@
               <strong id="top-confirmation">—</strong>
             </div>
             <p class="trigger-type" id="top-trigger">等待数据</p>
-            <div class="component-list" id="top-components"></div>
+            <details class="mobile-disclosure score-details" data-mobile-collapse open>
+              <summary>查看高点评分组成</summary>
+              <div class="component-list" id="top-components"></div>
+            </details>
           </article>
         </section>
 
@@ -137,7 +143,10 @@
             </div>
             <p>不用全部记住：负收益代表近期下跌，负均线偏离代表价格低于均线。</p>
           </div>
-          <div class="raw-grid" id="raw-metrics"></div>
+          <details class="mobile-disclosure" data-mobile-collapse open>
+            <summary>展开指标与解释</summary>
+            <div class="raw-grid" id="raw-metrics"></div>
+          </details>
         </section>
 
         <section class="panel model-audit" aria-labelledby="audit-title">
@@ -148,6 +157,8 @@
             </div>
             <span class="audit-period" id="audit-period">样本外：—</span>
           </div>
+          <details class="mobile-disclosure" data-mobile-collapse open>
+          <summary>查看新旧模型检验</summary>
           <div class="audit-grid">
             <article class="audit-card accepted">
               <div class="audit-card-head">
@@ -179,6 +190,7 @@
               <p class="audit-definition"><b>高点：</b>未来 20 日先跌 3%，再涨 3% 之前才算命中。</p>
             </article>
           </div>
+          </details>
           <p class="audit-footnote">这是原规则的历史路径检验，不等于识别到实际峰谷。2022 年后的数据已被反复研究，不能再称为全新独立测试；下方实验另行比较高低点定位效果。</p>
         </section>
 
@@ -190,9 +202,9 @@
               <p>金色菱形是事后答案；绿色看低点，红色看高点。点击或悬停日期查看详情。</p>
             </div>
             <div class="segmented compact year-toggle" id="year-toggle" aria-label="K线时间范围">
-              <button type="button" data-years="1">1年</button>
-              <button type="button" data-years="3">3年</button>
-              <button type="button" data-years="5" class="active">5年</button>
+              <button type="button" data-years="1" aria-pressed="false">1年</button>
+              <button type="button" data-years="3" aria-pressed="false">3年</button>
+              <button type="button" data-years="5" class="active" aria-pressed="true">5年</button>
             </div>
           </div>
 
@@ -232,6 +244,12 @@
               </div>
             </div>
             <div class="backtest-summary" id="backtest-summary"></div>
+            <div class="chart-view-tools" role="group" aria-label="放大或还原K线，不改变统计范围">
+              <span>放大看走势</span>
+              <button type="button" id="chart-recent">最近 3 个月</button>
+              <button type="button" id="chart-reset">显示全段</button>
+            </div>
+            <p class="chart-touch-hint">轻点 K 线看下方详情；拖动底部滑块缩放。横屏看图更清楚。</p>
             <div class="backtest-chart" id="five-year-chart" role="img" aria-label="QQQ 日K线：事后高低点、历史拟合和向后预测对照"></div>
             <div class="experiment-detail" id="experiment-detail" role="status" aria-live="polite" hidden></div>
             <div class="experiment-stats" id="experiment-stats" hidden></div>
@@ -248,7 +266,7 @@
           </article>
         </section>
 
-        <section class="historical-section" aria-labelledby="historical-title">
+        <section class="historical-section" id="historical-results" aria-labelledby="historical-title">
           <div class="section-heading historical-heading">
             <div>
               <p class="eyebrow">用历史回答</p>
@@ -387,11 +405,11 @@
       </footer>
     </div>
 
-    <dialog id="methodology-dialog" class="methodology-dialog">
+    <dialog id="methodology-dialog" class="methodology-dialog" aria-labelledby="methodology-title">
       <div class="dialog-head">
         <div>
           <p class="eyebrow">方法说明</p>
-          <h2>数据与统计口径</h2>
+          <h2 id="methodology-title">数据与统计口径</h2>
         </div>
         <button id="close-methodology" type="button" aria-label="关闭">×</button>
       </div>
@@ -423,8 +441,13 @@
       </div>
     </dialog>
 
+    <nav class="mobile-nav" aria-label="页面快捷导航">
+      <a href="#today">当前判断</a>
+      <a href="#learning-experiment">高低点图</a>
+      <a href="#historical-results">历史表现</a>
+    </nav>
     <script src="assets/echarts.min.js"></script>
-    <script src="experiment.js?v=pivot-v1"></script>
-    <script src="app.js?v=pivot-v1"></script>
+    <script src="experiment.js?v=mobile-v1"></script>
+    <script src="app.js?v=mobile-v1"></script>
   </body>
 </html>

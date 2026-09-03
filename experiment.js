@@ -70,7 +70,24 @@
     return rows.join("<br>");
   }
 
+  // Layout-only options also update safely on rotation, without resetting zoom/data.
+  function viewportOption(compact = false) {
+    return {
+      grid: { left: compact ? 44 : 62, right: compact ? 10 : 16, top: 58, bottom: compact ? 96 : 78 },
+      legend: { top: 8, right: 8, itemWidth: 14, itemGap: 14, textStyle: { color: COLORS.muted, fontSize: 12 } },
+      axisPointer: { triggerOn: compact ? "click" : "mousemove|click" },
+      tooltip: { showContent: !compact, triggerOn: compact ? "click" : "mousemove|click", confine: true },
+      xAxis: { axisLabel: { color: COLORS.muted, fontSize: 12, hideOverlap: true } },
+      yAxis: { splitNumber: compact ? 4 : 5, nameTextStyle: { color: COLORS.muted, fontSize: 12 }, axisLabel: { color: COLORS.muted, fontSize: 12 } },
+      dataZoom: [
+        { type: "inside", disabled: compact, zoomOnMouseWheel: !compact, moveOnMouseMove: !compact, preventDefaultMouseMove: !compact, minValueSpan: 20 },
+        { type: "slider", bottom: 16, height: compact ? 32 : 24, handleSize: compact ? "140%" : "100%", moveHandleSize: compact ? 12 : 7, showDetail: !compact, brushSelect: !compact, borderColor: COLORS.grid, backgroundColor: "#0a0e13", fillerColor: "rgba(142,184,255,.14)", handleStyle: { color: "#8eb8ff" }, textStyle: { color: COLORS.muted, fontSize: 12 } },
+      ],
+    };
+  }
+
   function option(v, compact = false) {
+    const viewport = viewportOption(compact);
     const bars = v.bars, byDate = new Map(bars.map((b) => [b.date, b]));
     const pendingStart = bars.find((b) => b.date > v.data.evaluation_end)?.date;
     const series = [
@@ -84,7 +101,7 @@
         if (mode === "answer" && !v.showAnswers) continue;
         const distance = mode === "answer" ? 0 : mode === "walkforward" ? .025 : .05;
         series.push({ name: `${NAMES[mode]} · ${NAMES[side]}`, type: "scatter", symbol: mode === "answer" ? "diamond" : mode === "fullfit" ? "circle" : "triangle", symbolRotate: mode === "walkforward" && side === "top" ? 180 : 0,
-          symbolSize: mode === "answer" ? 11 : 13, z: mode === "answer" ? 10 : 9,
+          symbolSize: mode === "answer" ? (compact ? 13 : 11) : (compact ? 16 : 13), z: mode === "answer" ? 10 : 9,
           data: v.markers.filter((m) => m.side === side && m.mode === mode).map((marker) => {
             const bar = byDate.get(marker.date);
             const price = mode === "answer" ? bar.close : side === "bottom" ? bar.low * (1 - distance) : bar.high * (1 + distance);
@@ -94,14 +111,14 @@
       }
     }
     return {
+      ...viewport,
       animation: false,
       aria: { enabled: true, description: "QQQ 日线。金色菱形为事后高低点；绿红三角为向后预测，紫色空心圆为历史拟合。" },
-      grid: { left: compact ? 48 : 62, right: 16, top: 52, bottom: 78 },
-      legend: { data: ["QQQ 日K", "MA20", "MA50"], top: 8, right: 8, textStyle: { color: COLORS.muted, fontSize: 12 } },
-      tooltip: { trigger: "axis", triggerOn: "mousemove|click", confine: true, backgroundColor: "#10161e", borderColor: "#313c49", textStyle: { color: "#edf2f7", fontSize: 14 }, extraCssText: "max-width:min(440px,85vw);white-space:normal;line-height:1.7;", axisPointer: { type: "cross" }, formatter: (params) => dayDescription(v, params.find((p) => p.data?.bar)?.data.bar.date || params[0]?.axisValue) },
+      legend: { ...viewport.legend, data: ["QQQ 日K", "MA20", "MA50"] },
+      tooltip: { ...viewport.tooltip, trigger: "axis", backgroundColor: "#10161e", borderColor: "#313c49", textStyle: { color: "#edf2f7", fontSize: 14 }, extraCssText: "max-width:min(440px,85vw);white-space:normal;line-height:1.7;", axisPointer: { type: "cross" }, formatter: (params) => dayDescription(v, params.find((p) => p.data?.bar)?.data.bar.date || params[0]?.axisValue) },
       xAxis: { type: "category", data: bars.map((b) => b.date), boundaryGap: true, axisLine: { lineStyle: { color: COLORS.grid } }, axisTick: { show: false }, axisLabel: { color: COLORS.muted, fontSize: 12, hideOverlap: true, formatter: (value) => value.slice(0, 7) } },
-      yAxis: { type: "value", scale: true, splitNumber: 5, name: "QQQ / 美元", nameTextStyle: { color: COLORS.muted, fontSize: 12 }, axisLabel: { color: COLORS.muted, fontSize: 12 }, splitLine: { lineStyle: { color: COLORS.grid } } },
-      dataZoom: [{ type: "inside", minValueSpan: 20 }, { type: "slider", bottom: 14, height: 24, borderColor: COLORS.grid, backgroundColor: "#0a0e13", fillerColor: "rgba(142,184,255,.14)", handleStyle: { color: "#8eb8ff" }, textStyle: { color: COLORS.muted, fontSize: 12 } }], series,
+      yAxis: { ...viewport.yAxis, type: "value", scale: true, name: "QQQ / 美元", splitLine: { lineStyle: { color: COLORS.grid } } },
+      series,
     };
   }
 
@@ -127,5 +144,5 @@
     if (index < 0) return null;
     return { index, startValue: v.bars[Math.max(0, index - 22)].date, endValue: v.bars[Math.min(v.bars.length - 1, index + 20)].date };
   }
-  return { validate, view, option, statsHTML, dayDescription, warning, focus, safe };
+  return { validate, view, option, viewportOption, statsHTML, dayDescription, warning, focus, safe };
 });

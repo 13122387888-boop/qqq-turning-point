@@ -24,6 +24,9 @@ let experimentView = null;
 let candleMode = "walkforward";
 let experimentSide = "both";
 let showPivotAnswers = true;
+let compactCharts = window.innerWidth <= 820;
+let candleBars = [];
+let candleDescription = () => "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -380,9 +383,10 @@ function chartBase() {
     textStyle: { color: COLORS.text, fontFamily: "Consolas, monospace" },
     tooltip: {
       trigger: "axis",
+      confine: true,
       backgroundColor: "#10161e",
       borderColor: "#313c49",
-      textStyle: { color: "#edf2f7", fontSize: 11 },
+      textStyle: { color: "#edf2f7", fontSize: 14 },
     },
   };
 }
@@ -395,6 +399,7 @@ function renderFiveYearChart() {
   $("#experiment-stats").hidden = !experimental;
   $("#legacy-guide").hidden = Boolean(experimental);
   $("#experiment-detail").hidden = true;
+  $("#experiment-detail").classList.remove("is-placeholder");
   $$("#experiment-modes button").forEach((button) => {
     const active = button.dataset.mode === candleMode;
     button.classList.toggle("active", active);
@@ -417,10 +422,30 @@ function renderFiveYearChart() {
   cutoff.setUTCFullYear(cutoff.getUTCFullYear() - candleYears);
   const cutoffText = cutoff.toISOString().slice(0, 10);
   const bars = source.bars.filter((bar) => bar.date >= cutoffText);
+  candleBars = bars;
   const visibleDates = new Set(bars.map((bar) => bar.date));
   const bottomEvents = source.bottom_events.filter((event) => visibleDates.has(event.date));
   const topEvents = source.top_events.filter((event) => visibleDates.has(event.date));
   const barByDate = new Map(bars.map((bar) => [bar.date, bar]));
+  candleDescription = (date) => {
+    const bar = barByDate.get(date);
+    if (!bar) return "";
+    const rows = [
+      `<strong>${bar.date} · 收盘 ${number(bar.close, 2)}</strong>`,
+      `开盘 ${number(bar.open, 2)}　最高 ${number(bar.high, 2)}　最低 ${number(bar.low, 2)}`,
+      `当日涨跌 ${percent((bar.close / bar.open - 1) * 100, 2)}`,
+      `<span style="color:${COLORS.bottom}">低点评分 ${number(bar.bottom_score)}</span>　<span style="color:${COLORS.top}">高点评分 ${number(bar.top_score)}</span>`,
+    ];
+    for (const [side, events] of [["bottom", bottomEvents], ["top", topEvents]]) {
+      for (const event of events.filter((item) => item.date === date)) {
+        rows.push(`<b style="color:${COLORS[side]}">${side === "bottom" ? "低点条件" : "高位风险"}（${event.confirmed ? "已确认" : "未确认"}）</b>`);
+        rows.push(`评分 ${number(event.score)}｜20 日后 ${event.future_20d_return == null ? "待观察" : percent(event.future_20d_return)}｜60 日后 ${event.future_60d_return == null ? "待观察" : percent(event.future_60d_return)}`);
+        rows.push(event.confirmed ? `确认方式：${triggerLabel(event.trigger_type)}` : "当天尚未出现价格确认");
+      }
+    }
+    rows.push("原规则评分不是成功概率，高分不代表一定反转。");
+    return rows.join("<br>");
+  };
 
   $("#backtest-summary").innerHTML = `
     <span>当前范围<strong>${bars[0]?.date || "—"} 至 ${bars.at(-1)?.date || "—"}</strong></span>
@@ -465,30 +490,7 @@ function renderFiveYearChart() {
         ...chartBase().tooltip,
         trigger: "axis",
         axisPointer: { type: "cross", label: { backgroundColor: "#26313d" } },
-        formatter: (params) => {
-          const candle = params.find((item) => item.seriesType === "candlestick");
-          if (!candle?.data?.bar) return "";
-          const bar = candle.data.bar;
-          const eventItems = params.filter((item) => item.data?.event);
-          const change = (bar.close / bar.open - 1) * 100;
-          const rows = [
-            `<strong>${bar.date}</strong>`,
-            `开盘 ${number(bar.open, 2)}　最高 ${number(bar.high, 2)}`,
-            `最低 ${number(bar.low, 2)}　收盘 ${number(bar.close, 2)}`,
-            `当日涨跌 ${percent(change, 2)}`,
-            `<span style="color:${COLORS.bottom}">低点评分 ${number(bar.bottom_score, 1)}</span>　<span style="color:${COLORS.top}">高点评分 ${number(bar.top_score, 1)}</span>`,
-          ];
-          eventItems.forEach((item) => {
-            const event = item.data.event;
-            const side = item.seriesName.includes("低点") ? "bottom" : "top";
-            rows.push(
-              `<span style="color:${COLORS[side]}"><strong>${side === "bottom" ? "低点条件" : "高位风险"}${event.confirmed ? "（出现价格确认）" : "（未确认）"}</strong></span>`,
-              `评分 ${number(event.score, 1)}｜20日后 ${event.future_20d_return == null ? "待观察" : percent(event.future_20d_return)}｜60日后 ${event.future_60d_return == null ? "待观察" : percent(event.future_60d_return)}`,
-              event.confirmed ? `确认方式：${triggerLabel(event.trigger_type)}` : "当天尚未出现价格确认",
-            );
-          });
-          return rows.join("<br>");
-        },
+        formatter: (params) => candleDescription(params.find((item) => item.data?.bar)?.data.bar.date || params[0]?.axisValue),
       },
       xAxis: {
         type: "category",
@@ -576,6 +578,8 @@ function renderFiveYearChart() {
     },
     true,
   );
+  if (window.PivotExperiment) candleChart.setOption(window.PivotExperiment.viewportOption(compactCharts));
+  bindCandleInspection();
 }
 
 function renderExperimentChart() {
@@ -590,23 +594,50 @@ function renderExperimentChart() {
   key.push('<span>绿色 / 下方看低点，红色 / 上方看高点</span>');
   $("#experiment-key").innerHTML = key.join("");
   const bars = experimentView.bars;
+  candleBars = bars;
+  candleDescription = (date) => api.dayDescription(experimentView, date);
   $("#backtest-summary").innerHTML = `<span>图中范围<strong>${bars[0]?.date || "—"} 至 ${bars.at(-1)?.date || "—"}</strong></span><span>答案与统计截止<strong>${experimentData.evaluation_end}</strong></span><span>之后为灰色待观察区</span>`;
   $("#experiment-stats").innerHTML = api.statsHTML(experimentView);
   setText("#backtest-note", "上方统计按所选年份计算：提示命中看误报，峰谷覆盖看漏报。命中指在事后答案前后 3 个交易日内；这不是买卖收益率。尚未成熟的日期不计分，缩放图表不改变统计范围。");
   setText("#experiment-parameters", `实验参数：低点触发 ${experimentData.sides.bottom.threshold} 分，同类间隔 ${experimentData.sides.bottom.spacing} 日；高点触发 ${experimentData.sides.top.threshold} 分，同类间隔 ${experimentData.sides.top.spacing} 日。分数是模型输出，与原评分不是同一种指标。`);
   if (!candleChart) candleChart = echarts.init($("#five-year-chart"));
-  candleChart.setOption(api.option(experimentView, window.innerWidth < 580), true);
+  candleChart.setOption(api.option(experimentView, compactCharts), true);
+  bindCandleInspection();
+}
+
+function bindCandleInspection() {
   candleChart.off("click", showExperimentDay);
   candleChart.on("click", showExperimentDay);
+  candleChart.off("updateAxisPointer", showCandleAxis);
+  candleChart.on("updateAxisPointer", showCandleAxis);
+  if (compactCharts) {
+    const detail = $("#experiment-detail");
+    detail.textContent = "轻点上方任意日期，查看当天分数与提示详情。";
+    detail.classList.add("is-placeholder");
+    detail.hidden = false;
+  }
 }
 
 function showExperimentDay(params) {
-  if (!experimentView) return;
-  const date = params?.data?.bar?.date || params?.data?.marker?.date;
-  if (!date) return;
+  const date = params?.data?.bar?.date || params?.data?.marker?.date || params?.data?.event?.date;
+  showCandleDate(date);
+}
+
+function showCandleDate(date) {
+  const description = candleDescription(date);
+  if (!description) return;
   const detail = $("#experiment-detail");
-  detail.innerHTML = window.PivotExperiment.dayDescription(experimentView, date);
+  detail.innerHTML = description;
+  detail.classList.remove("is-placeholder");
   detail.hidden = false;
+}
+
+function showCandleAxis(event) {
+  if (!compactCharts) return;
+  const axis = event.axesInfo?.find((item) => item.axisDim === "x");
+  if (!axis) return;
+  const date = typeof axis.value === "number" ? candleBars[axis.value]?.date : axis.value;
+  showCandleDate(date);
 }
 
 function renderBucketChart() {
@@ -621,11 +652,11 @@ function renderBucketChart() {
   bucketChart.setOption(
     {
       ...chartBase(),
-      grid: { left: 52, right: 54, top: 48, bottom: 42 },
+      grid: { left: 48, right: 48, top: 66, bottom: 42 },
       legend: {
         top: 8,
         right: 0,
-        textStyle: { color: COLORS.muted, fontSize: 10 },
+        textStyle: { color: "#a1afbf", fontSize: 12 },
         data: ["20日中位收益", activeSide === "bottom" ? "正收益率" : "下跌概率"],
       },
       xAxis: {
@@ -633,24 +664,24 @@ function renderBucketChart() {
         data: buckets.map((item) => item.bucket),
         axisLine: { lineStyle: { color: COLORS.grid } },
         axisTick: { show: false },
-        axisLabel: { color: COLORS.muted, fontSize: 10 },
+        axisLabel: { color: "#a1afbf", fontSize: 12, hideOverlap: true },
       },
       yAxis: [
         {
           type: "value",
           name: "收益率 %",
-          nameTextStyle: { color: COLORS.muted, fontSize: 9 },
+          nameTextStyle: { color: "#a1afbf", fontSize: 12 },
           splitLine: { lineStyle: { color: COLORS.grid } },
-          axisLabel: { color: COLORS.muted, formatter: "{value}%", fontSize: 9 },
+          axisLabel: { color: "#a1afbf", formatter: "{value}%", fontSize: 12 },
         },
         {
           type: "value",
           min: 0,
           max: 100,
           name: "概率 %",
-          nameTextStyle: { color: COLORS.muted, fontSize: 9 },
+          nameTextStyle: { color: "#a1afbf", fontSize: 12 },
           splitLine: { show: false },
-          axisLabel: { color: COLORS.muted, formatter: "{value}%", fontSize: 9 },
+          axisLabel: { color: "#a1afbf", formatter: "{value}%", fontSize: 12 },
         },
       ],
       series: [
@@ -664,7 +695,7 @@ function renderBucketChart() {
             show: true,
             position: "outside",
             color: COLORS.text,
-            fontSize: 9,
+            fontSize: 12,
             formatter: (item) => percent(item.value),
           },
           markLine: {
@@ -709,9 +740,10 @@ function renderEventChart(event) {
         axisLine: { lineStyle: { color: COLORS.grid } },
         axisTick: { show: false },
         axisLabel: {
-          color: COLORS.muted,
-          fontSize: 9,
+          color: "#a1afbf",
+          fontSize: 12,
           interval: 9,
+          hideOverlap: true,
           formatter: (value) => (Number(value) > 0 ? `+${value}` : value),
         },
       },
@@ -719,9 +751,9 @@ function renderEventChart(event) {
         type: "value",
         scale: true,
         name: "事件日 = 100",
-        nameTextStyle: { color: COLORS.muted, fontSize: 9 },
+        nameTextStyle: { color: "#a1afbf", fontSize: 12 },
         splitLine: { lineStyle: { color: COLORS.grid } },
-        axisLabel: { color: COLORS.muted, fontSize: 9 },
+        axisLabel: { color: "#a1afbf", fontSize: 12 },
       },
       series: [
         {
@@ -734,7 +766,7 @@ function renderEventChart(event) {
           markLine: {
             silent: true,
             symbol: "none",
-            label: { color, fontSize: 9 },
+            label: { color, fontSize: 12 },
             lineStyle: { color, type: "dashed", width: 1 },
             data: [
               { xAxis: "0", label: { formatter: "事件日" } },
@@ -805,6 +837,19 @@ function renderHistorical() {
 }
 
 function bindControls() {
+  // Native disclosures remain accessible without JavaScript; only the first
+  // mobile load collapses them, so rotating never discards the user's choices.
+  if (compactCharts) $$("[data-mobile-collapse]").forEach((detail) => { detail.open = false; });
+  $("#chart-recent").addEventListener("click", () => {
+    if (!candleChart || !candleBars.length) return;
+    const cutoff = new Date(`${candleBars.at(-1).date}T00:00:00Z`);
+    cutoff.setUTCMonth(cutoff.getUTCMonth() - 3);
+    const first = candleBars.find((bar) => bar.date >= cutoff.toISOString().slice(0, 10));
+    candleChart.dispatchAction({ type: "dataZoom", startValue: first.date, endValue: candleBars.at(-1).date });
+  });
+  $("#chart-reset").addEventListener("click", () => {
+    candleChart?.dispatchAction({ type: "dataZoom", start: 0, end: 100 });
+  });
   $$("#experiment-modes button").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.mode !== "legacy" && !experimentData) return;
@@ -837,9 +882,10 @@ function bindControls() {
   $$("#year-toggle button").forEach((button) => {
     button.addEventListener("click", () => {
       candleYears = Number(button.dataset.years);
-      $$("#year-toggle button").forEach((item) =>
-        item.classList.toggle("active", item === button),
-      );
+      $$("#year-toggle button").forEach((item) => {
+        item.classList.toggle("active", item === button);
+        item.setAttribute("aria-pressed", String(item === button));
+      });
       renderFiveYearChart();
     });
   });
@@ -866,6 +912,11 @@ function bindControls() {
   });
 
   window.addEventListener("resize", () => {
+    const nextCompact = window.innerWidth <= 820;
+    if (compactCharts !== nextCompact) {
+      compactCharts = nextCompact;
+      if (candleChart && window.PivotExperiment) candleChart.setOption(window.PivotExperiment.viewportOption(compactCharts));
+    }
     candleChart?.resize();
     bucketChart?.resize();
     eventChart?.resize();
