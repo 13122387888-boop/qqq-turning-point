@@ -6,11 +6,11 @@
     <meta name="theme-color" content="#080b10" />
     <meta
       name="description"
-      content="基于实时历史口径的 QQQ 相对高低点量化仪表盘。"
+      content="QQQ 相对高低点观察：对照历史答案、学习型模型拟合与逐年向后预测。"
     />
     <title>QQQ 转折点</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=pivot-v1" />
   </head>
   <body>
     <div class="app-shell">
@@ -23,6 +23,7 @@
           </span>
         </a>
         <div class="topbar-actions">
+          <a class="experiment-jump" href="#learning-experiment">学习实验 ↓</a>
           <span class="live-pill"><i></i> 数据已就绪</span>
           <button class="quiet-button" id="open-methodology" type="button">数据口径</button>
         </div>
@@ -31,7 +32,7 @@
       <main id="top">
         <section class="hero" aria-labelledby="page-title">
           <div>
-            <p class="eyebrow">样本外验证 • 无前视偏差 • V2.0</p>
+            <p class="eyebrow">规则观察 • 高低点学习实验</p>
             <h1 id="page-title">看清市场状态。<br /><span>尊重不确定性。</span></h1>
             <p class="hero-copy">
               量化 QQQ 的超卖、恐慌、价格延伸与反转条件。
@@ -55,7 +56,7 @@
 
         <div class="load-error" id="load-error" hidden>
           <strong>无法加载分析数据。</strong>
-          <span>请从项目目录启动本地服务器：<code>python -m http.server 8000</code></span>
+          <span>请刷新页面重试；本地使用时需从项目目录启动服务器。</span>
         </div>
 
         <section class="panel signal-overview" aria-labelledby="overview-title">
@@ -150,7 +151,7 @@
           <div class="audit-grid">
             <article class="audit-card accepted">
               <div class="audit-card-head">
-                <span>相对低点模型</span><strong>已通过</strong>
+                <span>相对低点模型</span><strong>历史改善</strong>
               </div>
               <div class="audit-score-line">
                 <div><small>旧模型</small><strong id="audit-bottom-v1">—</strong></div>
@@ -178,15 +179,15 @@
               <p class="audit-definition"><b>高点：</b>未来 20 日先跌 3%，再涨 3% 之前才算命中。</p>
             </article>
           </div>
-          <p class="audit-footnote">权重和候选模型只在 2022 年以前选择；2022 年以后完全留作最终考试。未通过的模型不会替换线上算法。</p>
+          <p class="audit-footnote">这是原规则的历史路径检验，不等于识别到实际峰谷。2022 年后的数据已被反复研究，不能再称为全新独立测试；下方实验另行比较高低点定位效果。</p>
         </section>
 
-        <section class="backtest-section" aria-labelledby="backtest-title">
+        <section class="backtest-section" id="learning-experiment" aria-labelledby="backtest-title">
           <div class="section-heading backtest-heading">
             <div>
-              <p class="eyebrow">把规则放回历史 K 线</p>
-              <h2 id="backtest-title">近 5 年，哪里出现过高低点条件？</h2>
-              <p>先看彩色标记，再把鼠标移上去看当时评分，以及之后 20 / 60 日的实际涨跌。</p>
+              <p class="eyebrow">学习型实验模式 · 原评分保持不变</p>
+              <h2 id="backtest-title">这些高低点，模型认出来了吗？</h2>
+              <p>金色菱形是事后答案；绿色看低点，红色看高点。点击或悬停日期查看详情。</p>
             </div>
             <div class="segmented compact year-toggle" id="year-toggle" aria-label="K线时间范围">
               <button type="button" data-years="1">1年</button>
@@ -196,7 +197,27 @@
           </div>
 
           <article class="panel backtest-panel">
-            <div class="backtest-guide" aria-label="图表阅读说明">
+            <div class="experiment-modes" id="experiment-modes" role="group" aria-label="选择历史对照方式">
+              <button type="button" data-mode="walkforward" class="active" aria-pressed="true">向后预测<span>只用以前的数据训练</span></button>
+              <button type="button" data-mode="fullfit" aria-pressed="false">历史拟合<span>已经学过这些答案</span></button>
+              <button type="button" data-mode="compare" aria-pressed="false">全部对照<span>三种标记放在一起</span></button>
+              <button type="button" data-mode="legacy" aria-pressed="false">原规则<span>保留原来的评分</span></button>
+            </div>
+            <div id="experiment-error" class="experiment-notice" role="status" hidden>学习数据暂时未加载，已显示原规则。请刷新重试。</div>
+            <div id="experiment-controls" hidden>
+              <div class="experiment-toolbar">
+                <div class="segmented compact" id="experiment-side" role="group" aria-label="筛选实验高低点">
+                  <button type="button" data-pivot-side="both" class="active" aria-pressed="true">全部</button>
+                  <button type="button" data-pivot-side="bottom" aria-pressed="false">只看低点</button>
+                  <button type="button" data-pivot-side="top" aria-pressed="false">只看高点</button>
+                </div>
+                <label class="experiment-answer-toggle"><input type="checkbox" id="show-pivot-answers" checked />显示事后答案</label>
+                <button class="experiment-locate" id="locate-july" type="button">定位 7 月 30 日</button>
+              </div>
+              <p id="experiment-warning" class="experiment-notice" role="status"></p>
+              <div class="experiment-key" id="experiment-key" aria-label="实验标记说明"></div>
+            </div>
+            <div class="backtest-guide" id="legacy-guide" aria-label="原规则图表阅读说明" hidden>
               <div class="guide-item bottom-guide">
                 <i aria-hidden="true"></i>
                 <span><strong>绿色向上</strong>：低点条件（评分 ≥70）</span>
@@ -211,10 +232,19 @@
               </div>
             </div>
             <div class="backtest-summary" id="backtest-summary"></div>
-            <div class="backtest-chart" id="five-year-chart" role="img" aria-label="QQQ 近五年日K线及潜在高低点历史标记"></div>
-            <p class="backtest-note">
-              这是回看规则，不是“事后挑最准的点”：每个评分只使用当日及以前的数据；标记至少间隔 20 个交易日，且只展示已经走完 60 日观察期的案例。绿色使用已通过的 V2 低点模型，红色仍只是研究中的风险提醒。
-            </p>
+            <div class="backtest-chart" id="five-year-chart" role="img" aria-label="QQQ 日K线：事后高低点、历史拟合和向后预测对照"></div>
+            <div class="experiment-detail" id="experiment-detail" role="status" aria-live="polite" hidden></div>
+            <div class="experiment-stats" id="experiment-stats" hidden></div>
+            <p class="backtest-note" id="backtest-note">正在读取图表数据。</p>
+            <details class="experiment-method" id="experiment-method" hidden>
+              <summary>这三种结果分别是什么意思？</summary>
+              <p><b>事后答案：</b>前后各 10 个交易日的收盘局部高低点，且之后 20 日至少反向运动 3%。只能事后标注，不是实时信号。</p>
+              <p><b>历史拟合：</b>模型学过最新已成熟样本后，回头重画历史。这里漂亮不代表未来也准。灰色待观察区不在拟合样本中，若有提示，属于这个最新模型的新预测。</p>
+              <p><b>向后预测：</b>每年只用此前已成熟标签训练，再预测这一年；输入只看当日及以前。该历史已被反复研究，不是盲测或实盘成绩。</p>
+              <p><b>命中与覆盖：</b>信号在答案前后 3 个交易日内才算匹配，每个答案只能匹配一次。“提示命中”看少不少误报，“低点/高点覆盖”看漏了多少。仅对已满 23 个后续交易日的日期评分。</p>
+              <p id="experiment-parameters"></p>
+              <p>图表缩放只放大画面；下方统计跟随 1 / 3 / 5 年筛选，不随拖动缩放改变。模型分数不是已校准成功概率，数据是离线快照，不会自动每日重训。</p>
+            </details>
           </article>
         </section>
 
@@ -345,7 +375,7 @@
         <aside class="risk-note" id="risk-note">
           <strong>正确理解评分。</strong>
           <p>
-            V2 低点评分通过了样本外路径检验，但仍不等于买入信号；高点评分尚未通过顶部预测验收，
+            V2 低点评分在既有历史样本中有所改善，但仍不等于买入信号；高点评分尚不足以可靠预测顶部，
             只能表示过热与高位风险，更不等于做空信号。样本数量、市场结构和路径风险同样重要。
           </p>
         </aside>
@@ -376,15 +406,15 @@
         </section>
         <section>
           <h3>评分</h3>
-          <p>V2 低点评分由 RSI 超卖 40% 与 5/10 日快速下跌 60% 组成，这是通过 2022 年以后样本外测试的简化权重。高点评分仍沿用 V1 的 RSI 30%、VIX 30%、价格偏离 25%、短期上涨 15%，但因未通过样本外验收，只解释为高位风险。</p>
+          <p>原规则的 V2 低点评分由 RSI 超卖 40% 与 5/10 日快速下跌 60% 组成。高点评分仍沿用 V1 的 RSI 30%、VIX 30%、价格偏离 25%、短期上涨 15%，只解释为高位风险。学习型实验是独立对照，不替换这里的当前评分。</p>
         </section>
         <section>
           <h3>事件与胜率</h3>
-          <p>同类型历史事件至少间隔 20 个交易日，并只纳入已有完整 60 日未来结果的事件。低点胜率指未来收益为正；高点胜率指未来收益为负。</p>
+          <p>原规则事件至少间隔 20 个交易日。原历史统计表只纳入已有完整 60 日结果的事件；K 线可显示更新的信号，尚未成熟的结果标为待观察。低点胜率指未来收益为正；高点胜率指未来收益为负。</p>
         </section>
         <section>
-          <h3>V2 样本外验收</h3>
-          <p>模型只用 2022 年以前的数据选权重；2022 年以后作为未参与调参的最终测试。相对点命中采用对称 3% 路径门槛：20 个交易日内必须先向正确方向走 3%，而不是先向错误方向走 3%。</p>
+          <h3>原规则历史检验与学习实验</h3>
+          <p>原规则的路径命中：20 日内先向正确方向走 3%，而不是先向错误方向走 3%。实验的高低点定位命中：在事后答案前后 3 日内。两种口径不能混比；2022 年后的历史已被研究过，不能称为全新独立测试。</p>
         </section>
         <section>
           <h3>限制</h3>
@@ -394,6 +424,7 @@
     </dialog>
 
     <script src="assets/echarts.min.js"></script>
-    <script src="app.js"></script>
+    <script src="experiment.js?v=pivot-v1"></script>
+    <script src="app.js?v=pivot-v1"></script>
   </body>
 </html>

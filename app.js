@@ -1,6 +1,7 @@
 "use strict";
 
 const DATA_URL = "data/turning_points.json";
+const EXPERIMENT_URL = "data/pivot_experiment.json?v=pivot-v1";
 const COLORS = {
   bottom: "#47d7a0",
   top: "#f17282",
@@ -18,6 +19,11 @@ let eventChart = null;
 let candleChart = null;
 let candleYears = 5;
 let selectedEventIndex = 0;
+let experimentData = null;
+let experimentView = null;
+let candleMode = "walkforward";
+let experimentSide = "both";
+let showPivotAnswers = true;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -123,7 +129,7 @@ function renderComponents(target, components, side) {
 function renderModelAudit() {
   const audit = model.model_audit;
   if (!audit) return;
-  setText("#audit-period", `样本外：${audit.evaluation_start} 至 ${audit.evaluation_end}`);
+  setText("#audit-period", `历史检验：${audit.evaluation_start} 至 ${audit.evaluation_end}`);
   setText("#audit-bottom-v1", rate(audit.bottom.v1.hit_rate));
   setText("#audit-bottom-v2", rate(audit.bottom.v2.hit_rate));
   setText("#audit-top-v1", rate(audit.top.v1.hit_rate));
@@ -383,10 +389,32 @@ function chartBase() {
 
 function renderFiveYearChart() {
   if (!window.echarts || !model?.five_year_chart) return;
-  const source = model.five_year_chart;
-  const end = new Date(`${source.end}T00:00:00`);
-  const cutoff = new Date(end);
-  cutoff.setFullYear(cutoff.getFullYear() - candleYears);
+  const experimental = candleMode !== "legacy" && experimentData && window.PivotExperiment;
+  $("#experiment-controls").hidden = !experimental;
+  $("#experiment-method").hidden = !experimental;
+  $("#experiment-stats").hidden = !experimental;
+  $("#legacy-guide").hidden = Boolean(experimental);
+  $("#experiment-detail").hidden = true;
+  $$("#experiment-modes button").forEach((button) => {
+    const active = button.dataset.mode === candleMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  if (experimental) {
+    renderExperimentChart();
+    return;
+  }
+  experimentView = null;
+  const source = { ...model.five_year_chart };
+  if (experimentData) {
+    source.bottom_events = experimentData.original_events.bottom;
+    source.top_events = experimentData.original_events.top;
+  }
+  setText("#backtest-note", experimentData
+    ? "原规则：评分只看当日及以前，同类提示至少间隔 20 日。最新提示也会显示，20 / 60 日结果尚未成熟时标为待观察；页面下方的原历史统计表仍只纳入已满 60 日的案例。"
+    : "学习数据未加载，当前显示原始快照：这里只含已有完整 60 日结果的案例，最近没有标记不代表没有信号。");
+  const cutoff = new Date(`${source.end}T00:00:00Z`);
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - candleYears);
   const cutoffText = cutoff.toISOString().slice(0, 10);
   const bars = source.bars.filter((bar) => bar.date >= cutoffText);
   const visibleDates = new Set(bars.map((bar) => bar.date));
@@ -455,7 +483,7 @@ function renderFiveYearChart() {
             const side = item.seriesName.includes("低点") ? "bottom" : "top";
             rows.push(
               `<span style="color:${COLORS[side]}"><strong>${side === "bottom" ? "低点条件" : "高位风险"}${event.confirmed ? "（出现价格确认）" : "（未确认）"}</strong></span>`,
-              `评分 ${number(event.score, 1)}｜20日后 ${percent(event.future_20d_return)}｜60日后 ${percent(event.future_60d_return)}`,
+              `评分 ${number(event.score, 1)}｜20日后 ${event.future_20d_return == null ? "待观察" : percent(event.future_20d_return)}｜60日后 ${event.future_60d_return == null ? "待观察" : percent(event.future_60d_return)}`,
               event.confirmed ? `确认方式：${triggerLabel(event.trigger_type)}` : "当天尚未出现价格确认",
             );
           });
@@ -548,6 +576,37 @@ function renderFiveYearChart() {
     },
     true,
   );
+}
+
+function renderExperimentChart() {
+  const api = window.PivotExperiment;
+  experimentView = api.view(experimentData, { years: candleYears, side: experimentSide, mode: candleMode, showAnswers: showPivotAnswers });
+  setText("#experiment-warning", api.warning(candleMode));
+  $("#experiment-warning").classList.toggle("is-fit", candleMode !== "walkforward");
+  const key = [];
+  if (showPivotAnswers) key.push('<span><b class="key-answer">◆</b>事后答案</span>');
+  if (candleMode !== "fullfit") key.push('<span><b class="key-bottom">▲</b><b class="key-top">▼</b>向后预测</span>');
+  if (candleMode !== "walkforward") key.push('<span><b class="key-fit">○</b>历史拟合（学过答案）</span>');
+  key.push('<span>绿色 / 下方看低点，红色 / 上方看高点</span>');
+  $("#experiment-key").innerHTML = key.join("");
+  const bars = experimentView.bars;
+  $("#backtest-summary").innerHTML = `<span>图中范围<strong>${bars[0]?.date || "—"} 至 ${bars.at(-1)?.date || "—"}</strong></span><span>答案与统计截止<strong>${experimentData.evaluation_end}</strong></span><span>之后为灰色待观察区</span>`;
+  $("#experiment-stats").innerHTML = api.statsHTML(experimentView);
+  setText("#backtest-note", "上方统计按所选年份计算：提示命中看误报，峰谷覆盖看漏报。命中指在事后答案前后 3 个交易日内；这不是买卖收益率。尚未成熟的日期不计分，缩放图表不改变统计范围。");
+  setText("#experiment-parameters", `实验参数：低点触发 ${experimentData.sides.bottom.threshold} 分，同类间隔 ${experimentData.sides.bottom.spacing} 日；高点触发 ${experimentData.sides.top.threshold} 分，同类间隔 ${experimentData.sides.top.spacing} 日。分数是模型输出，与原评分不是同一种指标。`);
+  if (!candleChart) candleChart = echarts.init($("#five-year-chart"));
+  candleChart.setOption(api.option(experimentView, window.innerWidth < 580), true);
+  candleChart.off("click", showExperimentDay);
+  candleChart.on("click", showExperimentDay);
+}
+
+function showExperimentDay(params) {
+  if (!experimentView) return;
+  const date = params?.data?.bar?.date || params?.data?.marker?.date;
+  if (!date) return;
+  const detail = $("#experiment-detail");
+  detail.innerHTML = window.PivotExperiment.dayDescription(experimentView, date);
+  detail.hidden = false;
 }
 
 function renderBucketChart() {
@@ -746,6 +805,35 @@ function renderHistorical() {
 }
 
 function bindControls() {
+  $$("#experiment-modes button").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.mode !== "legacy" && !experimentData) return;
+      candleMode = button.dataset.mode;
+      renderFiveYearChart();
+    });
+  });
+  $$("#experiment-side button").forEach((button) => {
+    button.addEventListener("click", () => {
+      experimentSide = button.dataset.pivotSide;
+      $$("#experiment-side button").forEach((item) => {
+        item.classList.toggle("active", item === button);
+        item.setAttribute("aria-pressed", String(item === button));
+      });
+      renderFiveYearChart();
+    });
+  });
+  $("#show-pivot-answers").addEventListener("change", (event) => {
+    showPivotAnswers = event.target.checked;
+    renderFiveYearChart();
+  });
+  $("#locate-july").addEventListener("click", () => {
+    if (!experimentView || !candleChart) return;
+    const focus = window.PivotExperiment.focus(experimentView, "2026-07-30");
+    if (!focus) return;
+    candleChart.dispatchAction({ type: "dataZoom", startValue: focus.startValue, endValue: focus.endValue });
+    candleChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: focus.index });
+    showExperimentDay({ data: { bar: experimentView.bars[focus.index] } });
+  });
   $$("#year-toggle button").forEach((button) => {
     button.addEventListener("click", () => {
       candleYears = Number(button.dataset.years);
@@ -789,6 +877,18 @@ async function init() {
     const response = await fetch(DATA_URL, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     model = await response.json();
+    try {
+      const experimentResponse = await fetch(EXPERIMENT_URL, { cache: "no-store" });
+      if (!experimentResponse.ok) throw new Error(`Experiment HTTP ${experimentResponse.status}`);
+      experimentData = window.PivotExperiment.validate(await experimentResponse.json());
+      if (experimentData.as_of !== model.current.date) throw new Error("Experiment snapshot date mismatch");
+    } catch (error) {
+      console.warn("Experiment unavailable; preserving original model", error);
+      experimentData = null;
+      candleMode = "legacy";
+      $("#experiment-error").hidden = false;
+      $$("#experiment-modes button").forEach((button) => { if (button.dataset.mode !== "legacy") button.disabled = true; });
+    }
     activeSide = model.current.bottom_score >= model.current.top_score ? "bottom" : "top";
     activeThreshold = autoThreshold(model.current[`${activeSide}_score`]);
     renderCurrent();
