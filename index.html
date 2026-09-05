@@ -10,7 +10,7 @@
     />
     <title>QQQ 转折点</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="style.css?v=soxx-v1" />
+    <link rel="stylesheet" href="style.css?v=v2-r1" />
   </head>
   <body>
     <div class="app-shell">
@@ -242,6 +242,26 @@
               <p id="experiment-warning" class="experiment-notice" role="status"></p>
               <div class="experiment-key" id="experiment-key" aria-label="实验标记说明"></div>
             </div>
+            <div class="v2-current-summary" id="v2-current-summary" hidden aria-label="V2 当前判断"></div>
+            <div class="v2-model-explainer" id="v2-model-explainer" hidden>
+              <article>
+                <span>第一关 · 位置</span>
+                <strong>像不像历史高低点？</strong>
+                <p>只看当天及以前的价量、均线、波动率和市场背景。</p>
+              </article>
+              <i aria-hidden="true">＋</i>
+              <article>
+                <span>第二关 · 结果</span>
+                <strong>后续风险回报合适吗？</strong>
+                <p>训练答案按波动率调整，SOXX 不再沿用与 QQQ 相同的固定幅度。</p>
+              </article>
+              <i aria-hidden="true">＋</i>
+              <article>
+                <span>第三关 · 确认</span>
+                <strong>价格真的开始反转了吗？</strong>
+                <p>三日内至少出现两项转折证据，并标在实际确认日，不倒画。</p>
+              </article>
+            </div>
             <div class="backtest-guide" id="legacy-guide" aria-label="原规则图表阅读说明" hidden>
               <div class="guide-item bottom-guide">
                 <i aria-hidden="true"></i>
@@ -460,7 +480,7 @@
       <a href="#historical-results">历史表现</a>
     </nav>
     <script src="assets/echarts.min.js"></script>
-    <script src="experiment.js?v=soxx-v1"></script>
-    <script src="app.js?v=soxx-v1"></script>
+    <script src="experiment.js?v=v2-r1"></script>
+    <script src="app.js?v=v2-r1"></script>
   </body>
 </html>

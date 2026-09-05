@@ -13,7 +13,7 @@
   const future = (v) => v === null || v === undefined ? "待观察" : `${Number(v) > 0 ? "+" : ""}${number(v)}%`;
 
   function validate(data) {
-    if (data?.version !== "pivot-supervised-v1" || !Array.isArray(data.bars) || !data.bars.length) throw new Error("Missing experiment data");
+    if (data?.version !== "turning-point-v2" || !Array.isArray(data.bars) || !data.bars.length) throw new Error("Missing V2 experiment data");
     if (data.ticker !== undefined && !["QQQ", "SOXX"].includes(data.ticker)) throw new Error("Invalid experiment ticker");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data.evaluation_end) || data.evaluation_end > data.as_of) throw new Error("Invalid experiment dates");
     for (const side of ["bottom", "top"]) {
@@ -43,8 +43,11 @@
         const events = data.sides[s].events[m].filter((event) => dates.has(event.date));
         const mature = events.filter((event) => event.status !== "pending");
         const hits = mature.filter((event) => event.status === "hit");
+        const payoffMature = events.filter((event) => event.payoff_status && event.payoff_status !== "pending");
+        const payoffHits = payoffMature.filter((event) => event.payoff_status === "hit");
+        const nextOpenHits = payoffMature.filter((event) => event.next_open_payoff_status === "hit");
         const covered = new Set(hits.filter((event) => dates.has(event.matched_date)).map((event) => event.matched_date)).size;
-        stats[s][m] = { signals: mature.length, hits: hits.length, pivots: pivots.length, covered, precision: mature.length ? hits.length / mature.length * 100 : null, recall: pivots.length ? covered / pivots.length * 100 : null, pending: events.length - mature.length };
+        stats[s][m] = { signals: mature.length, hits: hits.length, pivots: pivots.length, covered, precision: mature.length ? hits.length / mature.length * 100 : null, recall: pivots.length ? covered / pivots.length * 100 : null, payoffSignals: payoffMature.length, payoffHits: payoffHits.length, payoffRate: payoffMature.length ? payoffHits.length / payoffMature.length * 100 : null, nextOpenHits: nextOpenHits.length, nextOpenRate: payoffMature.length ? nextOpenHits.length / payoffMature.length * 100 : null, pending: events.length - mature.length };
         if (modes.includes(m)) events.forEach((event) => markers.push({ ...event, side: s, mode: m }));
       }
     }
@@ -62,12 +65,15 @@
       if (item.mode === "answer") rows.push(`<b style="color:${COLORS.answer}">◆ 事后${NAMES[item.side]}答案</b>：看完后续行情才能标注`);
       else {
         const status = item.status === "pending" ? "后续日期不足，待观察" : item.status === "hit" ? `靠近 ${safe(item.matched_date)} 的${NAMES[item.side]}` : "未靠近定义内的高低点";
-        rows.push(`<b style="color:${COLORS[item.side]}">${NAMES[item.mode]} · ${NAMES[item.side]}提示</b>：${status}`);
+        rows.push(`<b style="color:${COLORS[item.side]}">${NAMES[item.mode]} · ${NAMES[item.side]}确认</b>：${status}`);
+        if (item.warning_date) rows.push(`预警 ${safe(item.warning_date)} → 确认 ${safe(item.date)}（等待 ${item.confirmation_delay || 0} 日）`);
+        if (item.position_score !== undefined) rows.push(`位置分 ${number(item.position_score)} / 100　路径分 ${number(item.payoff_score)} / 100`);
+        if (item.adaptive_barrier !== undefined && item.adaptive_barrier !== null) rows.push(`当时自适应反转幅度 ${number(item.adaptive_barrier)}%　路径结果：${item.payoff_status === "hit" ? "先走对" : item.payoff_status === "loss" ? "先走错" : item.payoff_status === "timeout" ? "未触线" : "待观察"}`);
         rows.push(`20 日后 ${future(item.future_20d_return)}　60 日后 ${future(item.future_60d_return)}`);
       }
     });
     if (!v.markers.some((item) => item.date === date && item.mode !== "answer")) rows.push("当天没有独立提示；分数过线也可能处于防重复期。");
-    rows.push("分数不是成功概率。历史拟合学过答案，不代表当时预测。");
+    rows.push("位置分和路径分都不是成功概率。历史拟合学过答案，不代表当时预测。");
     return rows.join("<br>");
   }
 
@@ -115,7 +121,7 @@
     return {
       ...viewport,
       animation: false,
-      aria: { enabled: true, description: `${ticker} 日线。金色菱形为事后高低点；绿红三角为向后预测，紫色空心圆为历史拟合。` },
+      aria: { enabled: true, description: `${ticker} 日线。金色菱形为波动率自适应的事后高低点；绿红三角为V2向后预测确认，紫色空心圆为历史拟合。` },
       legend: { ...viewport.legend, data: [`${ticker} 日K`, "MA20", "MA50"] },
       tooltip: { ...viewport.tooltip, trigger: "axis", backgroundColor: "#10161e", borderColor: "#313c49", textStyle: { color: "#edf2f7", fontSize: 14 }, extraCssText: "max-width:min(440px,85vw);white-space:normal;line-height:1.7;", axisPointer: { type: "cross" }, formatter: (params) => dayDescription(v, params.find((p) => p.data?.bar)?.data.bar.date || params[0]?.axisValue) },
       xAxis: { type: "category", data: bars.map((b) => b.date), boundaryGap: true, axisLine: { lineStyle: { color: COLORS.grid } }, axisTick: { show: false }, axisLabel: { color: COLORS.muted, fontSize: 12, hideOverlap: true, formatter: (value) => value.slice(0, 7) } },
@@ -128,17 +134,18 @@
     return v.sides.map((side) => {
       const rows = v.modes.map((mode) => {
         const m = v.stats[side][mode];
-        return `<div class="experiment-stat-row"><span>${NAMES[mode]}</span><div><strong>${rate(m.precision)}</strong><small>提示命中 ${m.hits}/${m.signals}</small></div><div><strong>${rate(m.recall)}</strong><small>${NAMES[side]}覆盖 ${m.covered}/${m.pivots}</small></div>${m.pending ? `<p>${m.pending} 个新提示待观察，不计入命中率</p>` : ""}</div>`;
+        return `<div class="experiment-stat-row"><span>${NAMES[mode]}</span><div><strong>${rate(m.precision)}</strong><small>定位命中 ${m.hits}/${m.signals}</small></div><div><strong>${rate(m.payoffRate)}</strong><small>路径先走对 ${m.payoffHits}/${m.payoffSignals}</small></div><div><strong>${rate(m.recall)}</strong><small>${NAMES[side]}覆盖 ${m.covered}/${m.pivots}</small></div>${m.pending ? `<p>${m.pending} 个新提示待观察，不计入命中率</p>` : ""}</div>`;
       }).join("");
       const baseline = v.stats[side].baseline;
-      return `<article class="experiment-stat-card ${side}-stat"><h3>${NAMES[side]}识别</h3>${rows}<p class="experiment-baseline">原规则对照：提示命中 ${baseline.hits}/${baseline.signals}，覆盖 ${baseline.covered}/${baseline.pivots} 个${NAMES[side]}</p></article>`;
+      const verdict = v.data.sides[side].status === "accepted" ? "已通过替换门槛" : "研究中，暂不替换旧模型";
+      return `<article class="experiment-stat-card ${side}-stat"><h3>${NAMES[side]}识别 <small>${verdict}</small></h3>${rows}<p class="experiment-baseline">原规则对照：定位 ${baseline.hits}/${baseline.signals}，路径 ${baseline.payoffHits}/${baseline.payoffSignals}，覆盖 ${baseline.covered}/${baseline.pivots} 个${NAMES[side]}</p></article>`;
     }).join("");
   }
 
   function warning(mode) {
-    if (mode === "fullfit") return "正在看历史拟合：模型学过这些答案。这里不是当时的预测，也不是未来胜率。";
-    if (mode === "compare") return "三种标记只作对照，统计分开计算；紫色历史拟合不能当成当时成功预测。";
-    return "正在看向后预测：每年只用此前已成熟标签训练。历史已被反复研究，不是全新盲测或实盘成绩。";
+    if (mode === "fullfit") return "正在看历史拟合：模型学过这些答案。这里只用于检查模型上限，不是当时的预测。";
+    if (mode === "compare") return "正在对照：金色是事后答案，彩色三角是V2向后确认，紫色空心圆是学过答案后的拟合。三类不能混算。";
+    return "正在看V2向后预测：每年只用此前已成熟标签训练；预警后最多等3日确认，标记不会倒画。历史已被反复研究，不是全新盲测或实盘成绩。";
   }
 
   function focus(v, date) {

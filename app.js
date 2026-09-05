@@ -4,8 +4,8 @@ const locationSearch = window.location && typeof window.location.search === "str
 const tickerMatch = locationSearch.match(/[?&]symbol=(QQQ|SOXX)(?:&|$)/i);
 const TICKER = tickerMatch ? tickerMatch[1].toUpperCase() : "QQQ";
 const dataPrefix = TICKER === "QQQ" ? "" : `${TICKER.toLowerCase()}_`;
-const DATA_URL = `data/${dataPrefix}turning_points.json?v=soxx-v1`;
-const EXPERIMENT_URL = `data/${dataPrefix}pivot_experiment.json?v=soxx-v1`;
+const DATA_URL = `data/${dataPrefix}turning_points.json?v=v2-r1`;
+const EXPERIMENT_URL = `data/${dataPrefix}turning_v2.json?v=v2-r1`;
 const COLORS = {
   bottom: "#47d7a0",
   top: "#f17282",
@@ -175,32 +175,78 @@ function renderSymbolModelSummary() {
   const note = $("#symbol-model-note");
   note.hidden = TICKER !== "SOXX" || !experimentData;
   if (note.hidden) return;
-  const latest = experimentData.bars.at(-1);
   const bottom = experimentData.sides.bottom;
   const top = experimentData.sides.top;
-  const lastBottom = bottom.events.walkforward.at(-1);
-  const lastTop = top.events.walkforward.at(-1);
-  const evaluationYear = experimentData.evaluation_end.slice(0, 4);
-  const currentYearBottom = bottom.annual?.[evaluationYear];
-  const currentYearTop = top.annual?.[evaluationYear];
-  const bottomOver = latest.bottom_walkforward >= bottom.threshold;
-  const topOver = latest.top_walkforward >= top.threshold;
-  const title = bottomOver && !topOver
-    ? "低点学习分已过线，但今天不是新的独立提示"
-    : topOver && !bottomOver
-      ? "高点学习分已过线，但今天不是新的独立提示"
-      : bottomOver && topOver
-        ? "高低点分数同时过线，需要谨慎解读"
-        : "当前没有新的专属高低点提示";
-  setText("#symbol-model-title", title);
+  const bottomStats = bottom.stats.walkforward;
+  const topStats = top.stats.walkforward;
+  setText("#symbol-model-title", "SOXX 专属 V2 已完成回测，暂不替换原模型");
   setText("#symbol-model-summary",
-    `${latest.date}：低点学习分 ${number(latest.bottom_walkforward)}（阈值 ${number(bottom.threshold, 0)}），高点学习分 ${number(latest.top_walkforward)}（阈值 ${number(top.threshold, 0)}）。` +
-    `最近低点提示为 ${lastBottom?.date || "无"}，最近高点提示为 ${lastTop?.date || "无"}。` +
-    `逐年向后检验中，低点提示命中 ${bottom.stats.walkforward.matched_signals}/${bottom.stats.walkforward.signals}，高点提示命中 ${top.stats.walkforward.matched_signals}/${top.stats.walkforward.signals}。` +
-    (currentYearBottom && currentYearTop
-      ? `${evaluationYear} 年截至成熟日分别为 ${currentYearBottom.matched_signals}/${currentYearBottom.signals} 和 ${currentYearTop.matched_signals}/${currentYearTop.signals}，年份间差异很大。`
-      : "") +
-    "命中指靠近事后峰谷，并非交易胜率。" );
+    `低点定位命中 ${bottomStats.matched_signals}/${bottomStats.signals}，但向后路径只命中 ${bottomStats.payoff.hits}/${bottomStats.payoff.n}；` +
+    `高点定位命中 ${topStats.matched_signals}/${topStats.signals}，向后路径命中 ${topStats.payoff.hits}/${topStats.payoff.n}。` +
+    "定位与后续走势必须同时过关，所以这些结果只作为研究证据，不作为买卖信号。" );
+}
+
+function v2RegimeLabel(regime) {
+  return {
+    UPTREND: "上升趋势",
+    WEAK_TREND: "偏弱或震荡",
+    HIGH_VOL: "高波动",
+  }[regime] || "未知环境";
+}
+
+function v2StateLabel(state, side) {
+  if (state === "CONFIRMED") return side === "bottom" ? "低点条件已确认" : "高位转弱已确认";
+  if (state === "WARNING") return side === "bottom" ? "低点进入观察" : "高位风险观察";
+  return "当前没有双门槛提示";
+}
+
+function renderV2CurrentSummary() {
+  const target = $("#v2-current-summary");
+  const explainer = $("#v2-model-explainer");
+  if (!experimentData || experimentData.version !== "turning-point-v2") {
+    target.hidden = true;
+    explainer.hidden = true;
+    return;
+  }
+  target.hidden = false;
+  explainer.hidden = false;
+  setText("#backtest-title", "V2 能否同时找准位置和后续方向？");
+  setText("#learning-experiment .eyebrow", "V2 双层拐点实验 · 原模型继续保留");
+  $("#experiment-method").innerHTML = `
+    <summary>V2 如何训练，怎样避免偷看未来？</summary>
+    <p><b>事后答案：</b>先用前后各 10 日的局部高低点定位，再要求后续 20 日达到自适应反转幅度。未来价格只负责制作训练答案，不进入当天指标。</p>
+    <p><b>自适应幅度：</b>${experimentData.adaptive_barrier}。SOXX 波动通常更大，因此不会再和 QQQ 共用同一个固定 3% 难度。</p>
+    <p><b>双层模型：</b>第一关判断“是否像历史拐点”，第二关判断“未来是否更可能先向正确方向运行”。两关都过线后，最多等待 3 日的真实价格确认。</p>
+    <p><b>向后预测：</b>每年只用此前已经成熟的答案训练，训练集与预测日之间隔离 ${experimentData.maturity_sessions} 个交易日。确认标在实际发生日，绝不倒画到最低点或最高点。</p>
+    <p><b>历史拟合：</b>模型已经学过图中成熟答案，只能观察解释上限，不能当作当时预测。2022 年后的行情也已被我们反复研究，不再属于全新盲测。</p>
+    <p><b>是否升级：</b>必须同时改善峰谷定位、波动率调整后的 20 日路径和次日开盘口径。未通过时页面会明确写“研究中”，不会替换原模型。</p>
+    <p id="experiment-parameters"></p>
+    <p>模型分数不是成功概率，回测未计手续费、滑点、税费和做空成本。数据是离线快照，不会自动每日重训。</p>`;
+  const cards = ["bottom", "top"].map((side) => {
+    const item = experimentData.sides[side];
+    const current = item.current;
+    const wf = item.stats.walkforward;
+    const accepted = item.status === "accepted";
+    return `
+      <article class="v2-current-card ${side}-v2 ${current.state === "CONFIRMED" ? "is-confirmed" : current.state === "WARNING" ? "is-warning" : ""}">
+        <div class="v2-current-head">
+          <span>${side === "bottom" ? "潜在低点" : "相对高位"}</span>
+          <b class="v2-verdict ${accepted ? "accepted" : "research"}">${accepted ? "通过替换门槛" : "研究中，暂不替换旧模型"}</b>
+        </div>
+        <h3>${v2StateLabel(current.state, side)}</h3>
+        <p>${current.date} · ${v2RegimeLabel(current.regime)}</p>
+        <div class="v2-gates">
+          <div><span>像历史拐点</span><strong>${number(current.position_score)}</strong><small>门槛 ${number(item.position_threshold, 0)}</small></div>
+          <div><span>后续路径</span><strong>${number(current.payoff_score)}</strong><small>门槛 ${number(item.payoff_threshold, 0)}</small></div>
+        </div>
+        <div class="v2-evidence">
+          <span>向后检验定位 <b>${wf.matched_signals}/${wf.signals}</b></span>
+          <span>路径先走对 <b>${wf.payoff.hits}/${wf.payoff.n}</b></span>
+          <span>次日开盘口径 <b>${wf.next_open_payoff.hits}/${wf.next_open_payoff.n}</b></span>
+        </div>
+      </article>`;
+  }).join("");
+  target.innerHTML = `<div class="v2-summary-heading"><div><span>V2 双层模型 · ${TICKER}</span><strong>先判断位置，再判断风险回报</strong></div><small>模型冻结 ${experimentData.frozen_on} · ${experimentData.model_hash}</small></div><div class="v2-current-grid">${cards}</div>`;
 }
 
 function renderOverview() {
@@ -471,9 +517,18 @@ function renderFiveYearChart() {
   }
   experimentView = null;
   const source = { ...model.five_year_chart };
-  if (experimentData) {
+  if (experimentData?.original_events) {
     source.bottom_events = experimentData.original_events.bottom;
     source.top_events = experimentData.original_events.top;
+  } else if (experimentData?.sides) {
+    for (const side of ["bottom", "top"]) {
+      const known = new Map(source[`${side}_events`].map((event) => [event.date, event]));
+      source[`${side}_events`] = experimentData.sides[side].events.baseline.map((event) => ({
+        ...event,
+        confirmed: known.get(event.date)?.confirmed || false,
+        trigger_type: known.get(event.date)?.trigger_type || "None",
+      }));
+    }
   }
   setText("#backtest-note", experimentData
     ? "原规则：评分只看当日及以前，同类提示至少间隔 20 日。最新提示也会显示，20 / 60 日结果尚未成熟时标为待观察；页面下方的原历史统计表仍只纳入已满 60 日的案例。"
@@ -658,8 +713,8 @@ function renderExperimentChart() {
   candleDescription = (date) => api.dayDescription(experimentView, date);
   $("#backtest-summary").innerHTML = `<span>图中范围<strong>${bars[0]?.date || "—"} 至 ${bars.at(-1)?.date || "—"}</strong></span><span>答案与统计截止<strong>${experimentData.evaluation_end}</strong></span><span>之后为灰色待观察区</span>`;
   $("#experiment-stats").innerHTML = api.statsHTML(experimentView);
-  setText("#backtest-note", "上方统计按所选年份计算：提示命中看误报，峰谷覆盖看漏报。命中指在事后答案前后 3 个交易日内；这不是买卖收益率。尚未成熟的日期不计分，缩放图表不改变统计范围。");
-  setText("#experiment-parameters", `实验参数：低点触发 ${experimentData.sides.bottom.threshold} 分，同类间隔 ${experimentData.sides.bottom.spacing} 日；高点触发 ${experimentData.sides.top.threshold} 分，同类间隔 ${experimentData.sides.top.spacing} 日。分数是模型输出，与原评分不是同一种指标。`);
+  setText("#backtest-note", `上方统计按所选年份计算：定位命中看误报，峰谷覆盖看漏报；路径命中看未来 20 日是否先向正确方向触及自适应幅度。确认信号允许在事后答案前后 ${experimentData.tolerance} 个交易日内匹配。尚未成熟的日期不计分。`);
+  setText("#experiment-parameters", `V2 参数：低点位置门槛 ${experimentData.sides.bottom.position_threshold}、路径门槛 ${experimentData.sides.bottom.payoff_threshold}；高点位置门槛 ${experimentData.sides.top.position_threshold}、路径门槛 ${experimentData.sides.top.payoff_threshold}。两侧均在 3 日内等待确认，同类提示至少间隔 ${experimentData.sides.bottom.spacing} / ${experimentData.sides.top.spacing} 日。每侧只使用 ${experimentData.sides.bottom.feature_count} / ${experimentData.sides.top.feature_count} 个因果特征。`);
   if (!candleChart) candleChart = echarts.init($("#five-year-chart"));
   candleChart.setOption(api.option(experimentView, compactCharts), true);
   bindCandleInspection();
@@ -996,8 +1051,9 @@ async function init() {
       experimentData = window.PivotExperiment.validate(await experimentResponse.json());
       if (experimentData.as_of !== model.current.date) throw new Error("Experiment snapshot date mismatch");
       if ((experimentData.ticker || "QQQ") !== TICKER) throw new Error("Experiment ticker mismatch");
-      setText("#locate-july", TICKER === "QQQ" ? "定位 7 月 30 日" : "定位统计截止日");
+      setText("#locate-july", "定位统计截止日");
       renderSymbolModelSummary();
+      renderV2CurrentSummary();
     } catch (error) {
       console.warn("Experiment unavailable; preserving original model", error);
       experimentData = null;

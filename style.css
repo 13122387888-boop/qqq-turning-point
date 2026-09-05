@@ -2001,6 +2001,35 @@ footer {
 .experiment-key { display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 14px; color: #a1afbf; }
 .experiment-key span { display: inline-flex; gap: 6px; align-items: center; }
 .experiment-key b { font-size: 20px; }
+.v2-current-summary { margin: 18px 0; border: 1px solid #354356; border-radius: 14px; background: linear-gradient(145deg, #111a25, #0d131c); overflow: hidden; }
+.v2-summary-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 16px 18px; border-bottom: 1px solid #2b3645; }
+.v2-summary-heading span { display: block; color: #8eb8ff; font-size: 13px; letter-spacing: .08em; }
+.v2-summary-heading strong { display: block; margin-top: 4px; color: #edf2f7; font-size: 18px; }
+.v2-summary-heading small { color: #8291a2; font-size: 12px; font-variant-numeric: tabular-nums; }
+.v2-current-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2-current-card { min-width: 0; padding: 18px; border-left: 3px solid transparent; }
+.v2-current-card + .v2-current-card { border-left-width: 1px; border-left-color: #2b3645; }
+.v2-current-card.bottom-v2.is-warning, .v2-current-card.bottom-v2.is-confirmed { border-left-color: #47d7a0; background: rgba(71, 215, 160, .04); }
+.v2-current-card.top-v2.is-warning, .v2-current-card.top-v2.is-confirmed { border-left-color: #f17282; background: rgba(241, 114, 130, .04); }
+.v2-current-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.v2-current-head > span { color: #aebed0; font-size: 14px; }
+.v2-verdict { padding: 5px 8px; border-radius: 999px; font-size: 12px; font-weight: 650; }
+.v2-verdict.accepted { color: #75e5b8; background: rgba(71, 215, 160, .12); }
+.v2-verdict.research { color: #e7c778; background: rgba(246, 206, 115, .11); }
+.v2-current-card h3 { margin: 13px 0 4px; color: #f4f7fb; font-size: 21px; }
+.v2-current-card > p { margin: 0; color: #8291a2; font-size: 14px; }
+.v2-gates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.v2-gates > div { padding: 12px; border: 1px solid #303c4b; border-radius: 10px; background: #0b1118; }
+.v2-gates span, .v2-gates small { display: block; color: #8291a2; font-size: 12px; }
+.v2-gates strong { display: block; margin: 5px 0 2px; color: #edf2f7; font-size: 26px; font-variant-numeric: tabular-nums; }
+.v2-evidence { display: flex; flex-wrap: wrap; gap: 7px 12px; margin-top: 14px; color: #96a5b5; font-size: 13px; }
+.v2-evidence b { color: #dce3eb; font-variant-numeric: tabular-nums; }
+.v2-model-explainer { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 12px; align-items: stretch; margin: 16px 0; }
+.v2-model-explainer article { padding: 15px; border: 1px solid #303b4b; border-radius: 11px; background: #101720; }
+.v2-model-explainer article > span { color: #8eb8ff; font-size: 12px; letter-spacing: .06em; }
+.v2-model-explainer strong { display: block; margin: 7px 0; color: #e9eef5; font-size: 15px; }
+.v2-model-explainer p { margin: 0; color: #8f9dad; font-size: 13px; line-height: 1.65; }
+.v2-model-explainer > i { align-self: center; color: #53657b; font-size: 20px; font-style: normal; }
 .key-answer { color: #f6ce73; }
 .key-bottom { color: #47d7a0; }
 .key-top { color: #f17282; }
@@ -2009,9 +2038,10 @@ footer {
 .experiment-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
 .experiment-stat-card { min-width: 0; border: 1px solid #303b4b; border-radius: 12px; padding: 18px; background: #111720; }
 .experiment-stat-card h3 { margin: 0 0 12px; font-size: 18px; }
+.experiment-stat-card h3 small { display: inline-block; margin-left: 8px; color: #e7c778; font-size: 12px; font-weight: 600; }
 .bottom-stat h3 { color: #47d7a0; }
 .top-stat h3 { color: #f17282; }
-.experiment-stat-row { display: grid; grid-template-columns: 86px repeat(2, minmax(0, 1fr)); gap: 10px; align-items: center; padding: 12px 0; }
+.experiment-stat-row { display: grid; grid-template-columns: 86px repeat(3, minmax(0, 1fr)); gap: 10px; align-items: center; padding: 12px 0; }
 .experiment-stat-row + .experiment-stat-row { border-top: 1px solid #303b4b; }
 .experiment-stat-row > span { color: #dce3eb; font-size: 14px; }
 .experiment-stat-row strong { display: block; color: #f0f3fa; font-size: clamp(23px, 2.4vw, 32px); font-variant-numeric: tabular-nums; }
@@ -2214,10 +2244,21 @@ body:has(.methodology-dialog[open]) { overflow: hidden; }
   .experiment-detail { font-size: 16px; line-height: 1.8; padding: 14px; }
   .experiment-detail.is-placeholder { color: var(--muted); border-style: dashed; font-size: 14px; }
   .experiment-stat-card { padding: 14px; }
-  .experiment-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+  .experiment-stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
   .experiment-stat-row > span { grid-column: 1 / -1; color: #c5b9ff; }
   .experiment-stat-row strong { font-size: 30px; }
   .experiment-stat-row small { line-height: 1.6; }
+  .v2-summary-heading { align-items: flex-start; padding: 14px; }
+  .v2-summary-heading small { max-width: 42%; text-align: right; overflow-wrap: anywhere; }
+  .v2-current-grid { grid-template-columns: 1fr; }
+  .v2-current-card { padding: 16px 14px; border-left-width: 3px; }
+  .v2-current-card + .v2-current-card { border-top: 1px solid #2b3645; border-left-width: 3px; }
+  .v2-current-head { align-items: flex-start; }
+  .v2-verdict { max-width: 58%; text-align: right; line-height: 1.45; }
+  .v2-evidence { font-size: 14px; line-height: 1.55; }
+  .v2-model-explainer { grid-template-columns: 1fr; gap: 8px; }
+  .v2-model-explainer > i { justify-self: center; transform: rotate(45deg); line-height: 1; }
+  .v2-model-explainer article { padding: 14px; }
   .experiment-method summary, .advanced-stats summary { min-height: 48px; font-size: 14px; }
   .experiment-method p { font-size: 16px; line-height: 1.75; }
   .advanced-stats summary::after { font-size: 14px; white-space: nowrap; }
@@ -2290,6 +2331,11 @@ body:has(.methodology-dialog[open]) { overflow: hidden; }
   .brand strong { font-size: 15px; }
   .symbol-switch a { min-width: 43px; }
   .quiet-button { padding-inline: 9px; }
+  .v2-summary-heading { flex-direction: column; }
+  .v2-summary-heading small { max-width: none; text-align: left; }
+  .v2-gates strong { font-size: 23px; }
+  .experiment-stat-row strong { font-size: 25px; }
+  .experiment-stat-row small { font-size: 12px; }
   .comparison-metric { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   .comparison-metric span { min-height: 0; }
 }
