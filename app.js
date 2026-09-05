@@ -1,7 +1,11 @@
 "use strict";
 
-const DATA_URL = "data/turning_points.json";
-const EXPERIMENT_URL = "data/pivot_experiment.json?v=pivot-v1";
+const locationSearch = window.location && typeof window.location.search === "string" ? window.location.search : "";
+const tickerMatch = locationSearch.match(/[?&]symbol=(QQQ|SOXX)(?:&|$)/i);
+const TICKER = tickerMatch ? tickerMatch[1].toUpperCase() : "QQQ";
+const dataPrefix = TICKER === "QQQ" ? "" : `${TICKER.toLowerCase()}_`;
+const DATA_URL = `data/${dataPrefix}turning_points.json?v=soxx-v1`;
+const EXPERIMENT_URL = `data/${dataPrefix}pivot_experiment.json?v=soxx-v1`;
 const COLORS = {
   bottom: "#47d7a0",
   top: "#f17282",
@@ -68,6 +72,27 @@ function autoThreshold(score) {
 function setText(selector, value) {
   const node = $(selector);
   if (node) node.textContent = value;
+}
+
+function configureTickerUI() {
+  document.title = `${TICKER} 转折点`;
+  setText("#brand-title", `${TICKER} 转折点`);
+  $("#brand-home").setAttribute("aria-label", `${TICKER} 转折点首页`);
+  setText("#hero-copy", `量化 ${TICKER} 的超卖、恐慌、价格延伸与反转条件。`);
+  setText("#current-price-label", `${TICKER} / 收盘价`);
+  setText("#footer-title", `${TICKER} 转折点 • 规则驱动的历史参照`);
+  $("#five-year-chart").setAttribute("aria-label", `${TICKER} 日K线：事后高低点、历史拟合和向后预测对照`);
+  $("#event-chart").setAttribute("aria-label", `所选历史案例的 ${TICKER} 归一化价格路径`);
+  $$(".symbol-switch a").forEach((link) => {
+    if (link.dataset.symbol === TICKER) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+  if (TICKER === "SOXX") {
+    setText("#bottom-score-explainer", "通用规则评分：分数越高，RSI 超卖和短期快速下跌越明显。SOXX 专属学习结果见下方实验。");
+    setText("#top-score-explainer", "通用规则评分：分数越高，过热、低恐慌和快速上涨越明显。SOXX 专属学习结果见下方实验。");
+    setText("#audit-title", "同一套通用规则，在 SOXX 上变准了吗？");
+    setText("#methodology-data", "SOXX 使用长桥证券复权日线，避免拆股被误判为暴跌；VIX 与其他市场背景按共同交易日对齐。页面是离线快照，不会自动每日更新。");
+  }
 }
 
 function stateClass(state) {
@@ -137,10 +162,45 @@ function renderModelAudit() {
   setText("#audit-bottom-v2", rate(audit.bottom.v2.hit_rate));
   setText("#audit-top-v1", rate(audit.top.v1.hit_rate));
   setText("#audit-top-v2", rate(audit.top.candidate.hit_rate));
-  setText(
-    "#audit-bottom-note",
-    `V2 在 ${audit.bottom.v2.event_count} 个独立案例中命中 ${audit.bottom.v2.hit_count} 次；旧模型为 ${audit.bottom.v1.hit_count} / ${audit.bottom.v1.event_count}。`,
-  );
+  const accepted = audit.bottom.status === "accepted";
+  $("#audit-bottom-card").className = `audit-card ${accepted ? "accepted" : "rejected"}`;
+  setText("#audit-bottom-status", accepted ? "历史改善" : "未通过");
+  setText("#audit-bottom-new-label", "V2 模型");
+  setText("#audit-bottom-note", accepted
+    ? `V2 在 ${audit.bottom.v2.event_count} 个独立案例中命中 ${audit.bottom.v2.hit_count} 次；旧模型为 ${audit.bottom.v1.hit_count} / ${audit.bottom.v1.event_count}。`
+    : `V2 在 ${audit.bottom.v2.event_count} 个案例中命中 ${audit.bottom.v2.hit_count} 次，未超过旧模型的 ${audit.bottom.v1.hit_count} / ${audit.bottom.v1.event_count}；SOXX 不采用这个结论。`);
+}
+
+function renderSymbolModelSummary() {
+  const note = $("#symbol-model-note");
+  note.hidden = TICKER !== "SOXX" || !experimentData;
+  if (note.hidden) return;
+  const latest = experimentData.bars.at(-1);
+  const bottom = experimentData.sides.bottom;
+  const top = experimentData.sides.top;
+  const lastBottom = bottom.events.walkforward.at(-1);
+  const lastTop = top.events.walkforward.at(-1);
+  const evaluationYear = experimentData.evaluation_end.slice(0, 4);
+  const currentYearBottom = bottom.annual?.[evaluationYear];
+  const currentYearTop = top.annual?.[evaluationYear];
+  const bottomOver = latest.bottom_walkforward >= bottom.threshold;
+  const topOver = latest.top_walkforward >= top.threshold;
+  const title = bottomOver && !topOver
+    ? "低点学习分已过线，但今天不是新的独立提示"
+    : topOver && !bottomOver
+      ? "高点学习分已过线，但今天不是新的独立提示"
+      : bottomOver && topOver
+        ? "高低点分数同时过线，需要谨慎解读"
+        : "当前没有新的专属高低点提示";
+  setText("#symbol-model-title", title);
+  setText("#symbol-model-summary",
+    `${latest.date}：低点学习分 ${number(latest.bottom_walkforward)}（阈值 ${number(bottom.threshold, 0)}），高点学习分 ${number(latest.top_walkforward)}（阈值 ${number(top.threshold, 0)}）。` +
+    `最近低点提示为 ${lastBottom?.date || "无"}，最近高点提示为 ${lastTop?.date || "无"}。` +
+    `逐年向后检验中，低点提示命中 ${bottom.stats.walkforward.matched_signals}/${bottom.stats.walkforward.signals}，高点提示命中 ${top.stats.walkforward.matched_signals}/${top.stats.walkforward.signals}。` +
+    (currentYearBottom && currentYearTop
+      ? `${evaluationYear} 年截至成熟日分别为 ${currentYearBottom.matched_signals}/${currentYearBottom.signals} 和 ${currentYearTop.matched_signals}/${currentYearTop.signals}，年份间差异很大。`
+      : "") +
+    "命中指靠近事后峰谷，并非交易胜率。" );
 }
 
 function renderOverview() {
@@ -484,7 +544,7 @@ function renderFiveYearChart() {
         itemWidth: 18,
         itemHeight: 8,
         textStyle: { color: COLORS.muted, fontSize: 10 },
-        data: ["QQQ 日K", "MA20", "MA50"],
+        data: [`${TICKER} 日K`, "MA20", "MA50"],
       },
       tooltip: {
         ...chartBase().tooltip,
@@ -509,7 +569,7 @@ function renderFiveYearChart() {
         type: "value",
         scale: true,
         splitNumber: 6,
-        name: "QQQ 价格（美元）",
+        name: `${TICKER} 价格（美元）`,
         nameTextStyle: { color: COLORS.muted, fontSize: 9 },
         splitLine: { lineStyle: { color: COLORS.grid } },
         axisLabel: { color: COLORS.muted, fontSize: 9 },
@@ -532,7 +592,7 @@ function renderFiveYearChart() {
       ],
       series: [
         {
-          name: "QQQ 日K",
+          name: `${TICKER} 日K`,
           type: "candlestick",
           data: bars.map((bar) => ({
             value: [bar.open, bar.close, bar.low, bar.high],
@@ -873,7 +933,8 @@ function bindControls() {
   });
   $("#locate-july").addEventListener("click", () => {
     if (!experimentView || !candleChart) return;
-    const focus = window.PivotExperiment.focus(experimentView, "2026-07-30");
+    const focusDate = experimentData.evaluation_end;
+    const focus = window.PivotExperiment.focus(experimentView, focusDate);
     if (!focus) return;
     candleChart.dispatchAction({ type: "dataZoom", startValue: focus.startValue, endValue: focus.endValue });
     candleChart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: focus.index });
@@ -928,11 +989,15 @@ async function init() {
     const response = await fetch(DATA_URL, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     model = await response.json();
+    if (model.ticker !== TICKER) throw new Error("Ticker snapshot mismatch");
     try {
       const experimentResponse = await fetch(EXPERIMENT_URL, { cache: "no-store" });
       if (!experimentResponse.ok) throw new Error(`Experiment HTTP ${experimentResponse.status}`);
       experimentData = window.PivotExperiment.validate(await experimentResponse.json());
       if (experimentData.as_of !== model.current.date) throw new Error("Experiment snapshot date mismatch");
+      if ((experimentData.ticker || "QQQ") !== TICKER) throw new Error("Experiment ticker mismatch");
+      setText("#locate-july", TICKER === "QQQ" ? "定位 7 月 30 日" : "定位统计截止日");
+      renderSymbolModelSummary();
     } catch (error) {
       console.warn("Experiment unavailable; preserving original model", error);
       experimentData = null;
@@ -947,10 +1012,11 @@ async function init() {
     renderFiveYearChart();
     renderHistorical();
   } catch (error) {
-    console.error("Failed to initialize QQQ Turning Point", error);
+    console.error(`Failed to initialize ${TICKER} Turning Point`, error);
     $("#load-error").hidden = false;
     setText("#market-state", "数据错误");
   }
 }
 
+configureTickerUI();
 init();

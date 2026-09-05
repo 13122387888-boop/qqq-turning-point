@@ -14,6 +14,7 @@
 
   function validate(data) {
     if (data?.version !== "pivot-supervised-v1" || !Array.isArray(data.bars) || !data.bars.length) throw new Error("Missing experiment data");
+    if (data.ticker !== undefined && !["QQQ", "SOXX"].includes(data.ticker)) throw new Error("Invalid experiment ticker");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data.evaluation_end) || data.evaluation_end > data.as_of) throw new Error("Invalid experiment dates");
     for (const side of ["bottom", "top"]) {
       if (!Array.isArray(data.sides?.[side]?.pivots)) throw new Error("Missing pivot labels");
@@ -88,10 +89,11 @@
 
   function option(v, compact = false) {
     const viewport = viewportOption(compact);
+    const ticker = v.data.ticker || "QQQ";
     const bars = v.bars, byDate = new Map(bars.map((b) => [b.date, b]));
     const pendingStart = bars.find((b) => b.date > v.data.evaluation_end)?.date;
     const series = [
-      { name: "QQQ 日K", type: "candlestick", data: bars.map((bar) => ({ value: [bar.open, bar.close, bar.low, bar.high], bar })), itemStyle: { color: "#aebed0", color0: "#4e5b6a", borderColor: "#c5d3e2", borderColor0: "#687688" },
+      { name: `${ticker} 日K`, type: "candlestick", data: bars.map((bar) => ({ value: [bar.open, bar.close, bar.low, bar.high], bar })), itemStyle: { color: "#aebed0", color0: "#4e5b6a", borderColor: "#c5d3e2", borderColor0: "#687688" },
         markArea: pendingStart ? { silent: true, itemStyle: { color: "rgba(154,170,190,0.07)" }, label: { show: true, color: COLORS.muted, fontSize: 12, position: "insideTop" }, data: [[{ name: "待观察", xAxis: pendingStart }, { xAxis: bars.at(-1).date }]] } : undefined },
       { name: "MA20", type: "line", data: bars.map((b) => b.ma20), showSymbol: false, lineStyle: { color: "#8eb8ff", width: 1.2 } },
       { name: "MA50", type: "line", data: bars.map((b) => b.ma50), showSymbol: false, lineStyle: { color: "#dcae5c", width: 1.2 } },
@@ -113,11 +115,11 @@
     return {
       ...viewport,
       animation: false,
-      aria: { enabled: true, description: "QQQ 日线。金色菱形为事后高低点；绿红三角为向后预测，紫色空心圆为历史拟合。" },
-      legend: { ...viewport.legend, data: ["QQQ 日K", "MA20", "MA50"] },
+      aria: { enabled: true, description: `${ticker} 日线。金色菱形为事后高低点；绿红三角为向后预测，紫色空心圆为历史拟合。` },
+      legend: { ...viewport.legend, data: [`${ticker} 日K`, "MA20", "MA50"] },
       tooltip: { ...viewport.tooltip, trigger: "axis", backgroundColor: "#10161e", borderColor: "#313c49", textStyle: { color: "#edf2f7", fontSize: 14 }, extraCssText: "max-width:min(440px,85vw);white-space:normal;line-height:1.7;", axisPointer: { type: "cross" }, formatter: (params) => dayDescription(v, params.find((p) => p.data?.bar)?.data.bar.date || params[0]?.axisValue) },
       xAxis: { type: "category", data: bars.map((b) => b.date), boundaryGap: true, axisLine: { lineStyle: { color: COLORS.grid } }, axisTick: { show: false }, axisLabel: { color: COLORS.muted, fontSize: 12, hideOverlap: true, formatter: (value) => value.slice(0, 7) } },
-      yAxis: { ...viewport.yAxis, type: "value", scale: true, name: "QQQ / 美元", splitLine: { lineStyle: { color: COLORS.grid } } },
+      yAxis: { ...viewport.yAxis, type: "value", scale: true, name: `${ticker} / 美元`, splitLine: { lineStyle: { color: COLORS.grid } } },
       series,
     };
   }

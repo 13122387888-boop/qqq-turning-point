@@ -6,23 +6,27 @@
     <meta name="theme-color" content="#080b10" />
     <meta
       name="description"
-      content="QQQ 相对高低点观察：对照历史答案、学习型模型拟合与逐年向后预测。"
+      content="QQQ 与 SOXX 相对高低点观察：对照历史答案、学习型模型拟合与逐年向后预测。"
     />
     <title>QQQ 转折点</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="style.css?v=mobile-v1" />
+    <link rel="stylesheet" href="style.css?v=soxx-v1" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#top" aria-label="QQQ 转折点首页">
+        <a class="brand" id="brand-home" href="#top" aria-label="QQQ 转折点首页">
           <span class="brand-mark" aria-hidden="true">转</span>
           <span>
-            <strong>QQQ 转折点</strong>
+            <strong id="brand-title">QQQ 转折点</strong>
             <small>相对高低点量化分析</small>
           </span>
         </a>
         <div class="topbar-actions">
+          <nav class="symbol-switch" aria-label="选择分析标的">
+            <a href="?symbol=QQQ" data-symbol="QQQ" aria-current="page">QQQ</a>
+            <a href="?symbol=SOXX" data-symbol="SOXX">SOXX</a>
+          </nav>
           <a class="experiment-jump" href="#learning-experiment">学习实验 ↓</a>
           <span class="live-pill"><i></i> 数据已就绪</span>
           <button class="quiet-button" id="open-methodology" type="button">数据口径</button>
@@ -34,13 +38,13 @@
           <div>
             <p class="eyebrow">规则观察 • 高低点学习实验</p>
             <h1 id="page-title">看清市场状态。<br /><span>尊重不确定性。</span></h1>
-            <p class="hero-copy">
+            <p class="hero-copy" id="hero-copy">
               量化 QQQ 的超卖、恐慌、价格延伸与反转条件。
             </p>
           </div>
           <div class="market-snapshot" aria-label="当前市场概览">
             <div>
-              <span class="metric-label">QQQ / 收盘价</span>
+              <span class="metric-label" id="current-price-label">QQQ / 收盘价</span>
               <strong id="current-price">—</strong>
             </div>
             <div>
@@ -58,6 +62,15 @@
           <strong>无法加载分析数据。</strong>
           <span>请刷新页面重试；本地使用时需从项目目录启动服务器。</span>
         </div>
+
+        <section class="panel symbol-model-note" id="symbol-model-note" aria-labelledby="symbol-model-title" hidden>
+          <div>
+            <p class="eyebrow">SOXX 专属学习模型</p>
+            <h2 id="symbol-model-title">正在读取专属模型</h2>
+            <p id="symbol-model-summary"></p>
+          </div>
+          <a href="#learning-experiment">查看高低点图 ↓</a>
+        </section>
 
         <section class="panel signal-overview" id="today" aria-labelledby="overview-title">
           <div class="overview-conclusion">
@@ -87,7 +100,7 @@
             <div class="score-readout">
               <strong id="bottom-score">—</strong><span>/ 100</span>
             </div>
-            <p class="score-explainer">V2：分数越高，RSI 超卖和短期快速下跌越明显。</p>
+            <p class="score-explainer" id="bottom-score-explainer">V2：分数越高，RSI 超卖和短期快速下跌越明显。</p>
             <div class="score-track score-track-bottom" aria-hidden="true">
               <i id="bottom-score-bar"></i><b class="threshold-60"></b><b class="threshold-75"></b>
             </div>
@@ -116,7 +129,7 @@
             <div class="score-readout">
               <strong id="top-score">—</strong><span>/ 100</span>
             </div>
-            <p class="score-explainer">分数越高，过热、低恐慌和快速上涨越明显。</p>
+            <p class="score-explainer" id="top-score-explainer">分数越高，过热、低恐慌和快速上涨越明显。</p>
             <div class="score-track score-track-top" aria-hidden="true">
               <i id="top-score-bar"></i><b class="threshold-60"></b><b class="threshold-75"></b>
             </div>
@@ -153,21 +166,21 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">先过考试，再改算法</p>
-              <h2 id="audit-title">V2 优化有没有真的变准？</h2>
+                <h2 id="audit-title">V2 优化有没有真的变准？</h2>
             </div>
             <span class="audit-period" id="audit-period">样本外：—</span>
           </div>
           <details class="mobile-disclosure" data-mobile-collapse open>
           <summary>查看新旧模型检验</summary>
           <div class="audit-grid">
-            <article class="audit-card accepted">
+            <article class="audit-card accepted" id="audit-bottom-card">
               <div class="audit-card-head">
-                <span>相对低点模型</span><strong>历史改善</strong>
+                <span>相对低点模型</span><strong id="audit-bottom-status">历史改善</strong>
               </div>
               <div class="audit-score-line">
                 <div><small>旧模型</small><strong id="audit-bottom-v1">—</strong></div>
                 <span>→</span>
-                <div><small>V2 模型</small><strong id="audit-bottom-v2">—</strong></div>
+                <div><small id="audit-bottom-new-label">V2 模型</small><strong id="audit-bottom-v2">—</strong></div>
               </div>
               <p id="audit-bottom-note">只采用最终测试期也能保持改善的简单规则。</p>
             </article>
@@ -400,7 +413,7 @@
       </main>
 
       <footer>
-        <span>QQQ 转折点 • 规则驱动的历史参照</span>
+        <span id="footer-title">QQQ 转折点 • 规则驱动的历史参照</span>
         <span id="footer-updated">最后更新 —</span>
       </footer>
     </div>
@@ -416,7 +429,7 @@
       <div class="dialog-body">
         <section>
           <h3>数据</h3>
-          <p>QQQ 与 VIX 日线按共同交易日取交集。数据更新脚本优先使用 yfinance；当 Yahoo 限流时，QQQ 使用 Longbridge，VIX 使用 Cboe 官方历史数据。</p>
+          <p id="methodology-data">QQQ 与 VIX 日线按共同交易日取交集。数据更新脚本优先使用 yfinance；当 Yahoo 限流时，QQQ 使用 Longbridge，VIX 使用 Cboe 官方历史数据。</p>
         </section>
         <section>
           <h3>无前视百分位</h3>
@@ -447,7 +460,7 @@
       <a href="#historical-results">历史表现</a>
     </nav>
     <script src="assets/echarts.min.js"></script>
-    <script src="experiment.js?v=mobile-v1"></script>
-    <script src="app.js?v=mobile-v1"></script>
+    <script src="experiment.js?v=soxx-v1"></script>
+    <script src="app.js?v=soxx-v1"></script>
   </body>
 </html>
